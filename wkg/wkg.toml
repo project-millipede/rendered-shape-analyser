@@ -1,0 +1,2 @@
+[overrides]
+"wasi:webgpu" = { path = "vendor/wasi-webgpu/wit" }

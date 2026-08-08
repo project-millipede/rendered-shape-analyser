@@ -1,0 +1,34 @@
+[package]
+name = "inspector-component"
+version = "0.1.0"
+edition = "2024"
+description = "GPU-free Component Model boundary (C0) for the millipede webgpu-inspector"
+license = "MIT"
+publish = false
+
+[workspace]
+members = [".", "xtask"]
+resolver = "3"
+
+[lib]
+# A reactor-style component: a library the host calls into, no main().
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.60.0"
+wgsl-macro = { version = "0.4.0", optional = true }
+
+[features]
+default = []
+gpu-analysis = ["dep:wgsl-macro"]
+gpu-analysis-async = ["dep:wgsl-macro"]
+gpu-analysis-frame = ["dep:wgsl-macro"]
+wasi-async-proofs = []
+
+[profile.release]
+# Size-lean settings: the transpiled artifacts are consumed as separate .wasm
+# files through the local loader package, so binary size is still part of review.
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1

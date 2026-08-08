@@ -1,0 +1,5 @@
+# Pin this crate to the stable channel without touching the machine's
+# default toolchain (a nightly). rustup auto-installs the wasm target.
+[toolchain]
+channel = "stable"
+targets = ["wasm32-unknown-unknown"]

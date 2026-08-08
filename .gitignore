@@ -1,0 +1,38 @@
+# macOS/editor noise
+.DS_Store
+
+# Dependency installs
+/node_modules/
+/.pnpm-store/
+
+# Rust build output and generated docs
+/target/
+
+# JavaScript build output
+/dist/
+/component-loader/dist/
+
+# jco transpile output written by `npm run sync`
+/pkg/generated/
+
+# Logs and transient local diagnostics
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Coverage/temp output
+/coverage/
+/.tmp/
+/tmp/
+
+# Next.js leftovers should never be created here, but keep them out if a
+# command is accidentally run from this package root.
+/.next/
+/.next.stale-*/
