@@ -55,8 +55,10 @@ interface gpu-analysis-frame {
   /// Rust must only append analysis commands. It must not finish this encoder,
   /// create a command buffer from it, or submit that command buffer. The
   /// browser remains the sole owner of rendering, finishing, and submission.
-  /// Returned buffers become usable only after the browser appends its render
-  /// pass, finishes this same encoder, and submits the resulting command buffer.
+  /// Returned GPU handles may be bound by a render pass appended to this same
+  /// encoder before it is finished. Their GPU-written contents become available
+  /// when the scheduler submits and executes the recorded work. CPU summary
+  /// readback must wait for submission completion.
   encode: func(
     encoder: borrow<gpu-command-encoder>,
     device: borrow<gpu-device>,
