@@ -1,0 +1,52 @@
+/// The analysis surface the website host calls into.
+///
+/// Shaped after the inspector's component-reference buffer so a later
+/// GPU-buffer transport is a re-plumbing, not a redesign: `node-record`
+/// mirrors the 32-byte `GroundTruthNode` of `ground-truth/layout-record.ts`
+/// field for field.
+interface analysis {
+  /// One layout node — field-for-field the component-reference buffer's 32-byte record.
+  record node-record {
+    /// x, y, width, height in TEXEL space (unsnapped; may exceed the
+    /// texture — overflow is information, not an error).
+    bounds: tuple<f32, f32, f32, f32>,
+    /// Composite nesting level; 1 = direct child of the captured root.
+    depth: u32,
+    /// Index of the parent within the same list; the sentinel
+    /// 0xffffffff (`NO_PARENT` in layout-record.ts) marks a root.
+    parent: u32,
+    /// Bit flags; bit 0 = ghost (laid out but paints nothing).
+    /// (`%` escapes the WIT keyword — the field is plain `flags` in every
+    /// generated binding.)
+    %flags: u32,
+    /// FNV-1a 32-bit hash of the component display name.
+    name-hash: u32,
+  }
+
+  /// Aggregates computed from one node tree.
+  record tree-stats {
+    /// Number of nodes received.
+    node-count: u32,
+    /// Maximum `depth` seen (0 for an empty tree).
+    max-depth: u32,
+    /// Number of nodes with the ghost flag set.
+    ghost-count: u32,
+    /// Sum of all node areas (width × height), in texels².
+    total-area: f64,
+    /// Sum of ROOT node areas divided by the texture area
+    /// (tex-w × tex-h); 0 when the texture is empty.
+    coverage: f64,
+  }
+
+  /// Liveness and version check.
+  /// Returns `inspector-component <crate-version>: <msg>` so the console
+  /// always shows which build is loaded.
+  ping: func(msg: string) -> string;
+
+  /// Replace the analysis parameters with a JSON document
+  /// (forward-compatible catch-all; stored verbatim, echoed to the log).
+  set-params: func(params-json: string);
+
+  /// Compute `tree-stats` over `nodes` for a tex-w × tex-h texture.
+  analyze-tree: func(nodes: list<node-record>, tex-w: u32, tex-h: u32) -> tree-stats;
+}

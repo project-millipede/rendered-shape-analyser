@@ -1,0 +1,77 @@
+/// Chrome/JSPI-only GPU analysis orchestration export.
+///
+/// This surface is experimental and must stay isolated from the stable
+/// `gpu-analysis` export. It proves jco's async component path for the
+/// analyzer by awaiting upstream browser WebGPU operations through JSPI.
+interface gpu-analysis-async {
+  use host-gpu.{analysis-border-trace-output, analysis-dispatch, analysis-edge-discovery-output, analysis-visual-output};
+  use wasi:webgpu/webgpu@0.0.1.{gpu-buffer, gpu-device, gpu-texture};
+
+  /// Backend-neutral aggregate statistics for one ground-truth node.
+  record analysis-summary-node-stats {
+    /// Index of the node inside the ground-truth buffer's node array.
+    node-index: u32,
+    /// Number of captured texels assigned to this node by the analyzer kernel.
+    texel-count: u32,
+    /// Number of assigned texels treated as visible ink by the analyzer kernel.
+    ink-count: u32,
+    /// Sum of per-texel luminance values after decoding the GPU summary buffer.
+    luminance-sum: f64,
+    /// Average luminance for this node, or zero when the node has no assigned texels.
+    mean-luminance: f64,
+  }
+
+  /// Complete compact diagnostic analysis summary for one inspector entry.
+  ///
+  /// This async return record intentionally omits `entry-id`. The browser
+  /// loader already owns that request metadata and reattaches it after the
+  /// component call, so this payload stays focused on numeric summary data.
+  record analysis-summary-result {
+    /// Width of the captured texture analyzed by the backend, in texels.
+    texture-width: u32,
+    /// Height of the captured texture analyzed by the backend, in texels.
+    texture-height: u32,
+    /// Number of ground-truth nodes available to the analysis run.
+    node-count: u32,
+    /// Per-node aggregate statistics, ordered by ground-truth node index.
+    nodes: list<analysis-summary-node-stats>,
+  }
+
+  /// Chrome/JSPI-only complete analyzer result.
+  ///
+  /// The summary is CPU-readable diagnostic data decoded by Rust after
+  /// upstream `gpu-buffer.map-async`. Reference-guided diagnostic visual output
+  /// remains in upstream GPU buffers and must be rendered directly rather than
+  /// decoded through JavaScript.
+  record analysis-result {
+    /// Compact CPU-readable diagnostic summary.
+    summary: analysis-summary-result,
+    /// GPU-resident reference-guided diagnostic rectangles.
+    visual: analysis-visual-output,
+    /// GPU-resident reference-guided diagnostic border trace.
+    border-trace: analysis-border-trace-output,
+    /// GPU-resident pixel-derived edge discovery written by the submitted command buffer.
+    edge-discovery: analysis-edge-discovery-output,
+  }
+
+  /// Start and await one per-component statistics analysis dispatch.
+  ///
+  /// Rust validates analyzer metadata, builds the analysis plan, creates
+  /// upstream shader-module, layout, pipeline, summary-buffer, and
+  /// visual-buffer resources through `wasi:webgpu`, encodes commands, submits
+  /// commands, awaits upstream async queue and staging-buffer readback, decodes
+  /// the compact aggregate summary in Rust, and returns that summary plus a
+  /// GPU-resident diagnostic output handles directly. This requires a runtime with
+  /// `WebAssembly.Suspending` and `WebAssembly.promising`. The returned summary
+  /// is not the pixel-derived production discovery path.
+  ///
+  /// Failures reject the async component call. This deliberately avoids the
+  /// `result<large-record, string>` JSPI lowering shape while that upstream
+  /// path remains unstable for our large analyzer result record.
+  analyze: async func(
+    device: borrow<gpu-device>,
+    texture: borrow<gpu-texture>,
+    truth-buffer: borrow<gpu-buffer>,
+    request: analysis-dispatch,
+  ) -> analysis-result;
+}

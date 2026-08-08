@@ -1,0 +1,35 @@
+/// WASI 0.3 / Component Model async proof surface.
+///
+/// This interface is deliberately separate from `analysis`: these functions
+/// are not product API. They exist to prove what jco exposes for the three
+/// async shapes we care about:
+///
+/// - `async func` -> JavaScript `Promise<T>`
+/// - `future<T>`  -> JavaScript `PromiseLike<T>`
+/// - `stream<T>`  -> JavaScript `AsyncIterable<T>` after the JSPI export
+///                   Promise resolves
+///
+/// Keep comments here explicit while this is new to the project; the point of
+/// this file is to make the generated host/guest behavior easy to inspect.
+interface wasi-async-proofs {
+  /// Prove WIT `async func`.
+  ///
+  /// In Rust this becomes an `async fn`. In jco-generated JS this should be
+  /// exposed as `proveAsyncFunc(value): Promise<number>`.
+  prove-async-func: async func(value: u32) -> u32;
+
+  /// Prove WIT `future<T>`.
+  ///
+  /// In Rust this is a reader/writer pair: the guest returns the reader and
+  /// completes the writer from a small task. In jco-generated JS this should
+  /// be exposed as `proveFuture(value): PromiseLike<number>`.
+  prove-future: func(value: u32) -> future<u32>;
+
+  /// Prove WIT `stream<T>`.
+  ///
+  /// In Rust this is also a reader/writer pair. The guest writes UTF-8 bytes
+  /// into the stream from a task. With the current JSPI export wrapper, host
+  /// code awaits `proveStream(label)` first, then reads the resulting
+  /// `AsyncIterable<number>`.
+  prove-stream: func(label: string) -> stream<u8>;
+}

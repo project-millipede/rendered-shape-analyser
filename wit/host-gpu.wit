@@ -1,0 +1,145 @@
+/// Project-owned GPU analyzer host interface.
+///
+/// GPU resource types come from upstream `wasi:webgpu`. This interface owns
+/// only the inspector-specific workflow: analyzer request/plan records,
+/// GPU-resident output handles, and explicit diagnostic readback metadata.
+/// Encoder completion remains world-specific: stable/async submit in Rust,
+/// while shared-frame leaves finishing and submission to the browser scheduler.
+interface host-gpu {
+  use wasi:webgpu/webgpu@0.0.1.{
+    gpu-buffer,
+    gpu-command-buffer,
+    gpu-device,
+  };
+
+  /// Metadata required to run and correlate one analyzer dispatch.
+  record analysis-dispatch {
+    /// Inspector entry id used to correlate late async completions.
+    entry-id: string,
+    /// Human-readable component name used for GPU/debug labels.
+    display-name: string,
+    /// Width of the captured texture in texels.
+    texture-width: u32,
+    /// Height of the captured texture in texels.
+    texture-height: u32,
+    /// Number of valid component-reference nodes in the reference buffer.
+    node-count: u32,
+  }
+
+  /// Analyzer kernel selected by the Rust component.
+  ///
+  /// New kernels must be added here before the host can dispatch them. This
+  /// keeps the Component Model boundary explicit: JavaScript owns browser GPU
+  /// objects, but Rust owns the analyzer workflow choice.
+  enum analysis-kernel {
+    /// P0 parity kernel: per-node texel, ink, and luminance aggregates.
+    per-component-stats-v1,
+  }
+
+  /// Complete execution plan for one analyzer dispatch.
+  ///
+  /// Rust builds this from `analysis-dispatch` before calling the host. The
+  /// host rejects unsupported plans before touching WebGPU resources.
+  record analysis-plan {
+    /// Original request metadata supplied by the website.
+    request: analysis-dispatch,
+    /// Analyzer kernel the host must run.
+    kernel: analysis-kernel,
+    /// X dimension of the WGSL workgroup selected by Rust.
+    workgroup-size-x: u32,
+    /// Y dimension of the WGSL workgroup selected by Rust.
+    workgroup-size-y: u32,
+    /// Number of workgroups Rust wants to dispatch in X.
+    dispatch-workgroups-x: u32,
+    /// Number of workgroups Rust wants to dispatch in Y.
+    dispatch-workgroups-y: u32,
+    /// Number of u32 diagnostic-summary words written per ground-truth node.
+    summary-words-per-node: u32,
+    /// Byte stride of one node's compact diagnostic-summary record.
+    summary-node-stride-bytes: u32,
+    /// Texel width/height of one pixel-derived edge-discovery tile.
+    edge-discovery-tile-size: u32,
+    /// Minimum Sobel evidence, in milli-units, required for a tile hit.
+    edge-discovery-threshold-milli: u32,
+    /// Maximum renderer-facing pixel-derived edge-discovery record slots.
+    ///
+    /// This is an internal capacity used to size GPU buffers. The visible
+    /// renderer path uses GPU-written indirect draw arguments instead of
+    /// passing CPU-side active draw metadata back to JavaScript.
+    edge-discovery-slot-capacity: u32,
+  }
+
+  /// GPU-resident reference-guided diagnostic rectangle output.
+  ///
+  /// This is not CPU-decoded data. It is an upstream `gpu-buffer` handle plus
+  /// the indirect draw arguments the inspector renderer needs to bind and draw
+  /// the buffer without decoding its records on the CPU.
+  record analysis-visual-output {
+    /// Rust-created upstream GPU buffer containing renderer-facing records.
+    buffer: gpu-buffer,
+    /// Rust-created upstream indirect draw arguments for this visual buffer.
+    indirect-buffer: gpu-buffer,
+  }
+
+  /// GPU-resident reference-guided diagnostic border-trace output.
+  ///
+  /// This is not the rectangle-output lane. One ordered diagnostic dispatch
+  /// samples captured texels along expected 2D borders and writes traced
+  /// border records into this separate buffer. JavaScript must render this
+  /// buffer directly instead of decoding it to draw borders.
+  record analysis-border-trace-output {
+    /// Rust-created upstream GPU buffer containing traced-border records.
+    buffer: gpu-buffer,
+    /// Rust-created upstream indirect draw arguments for this trace buffer.
+    indirect-buffer: gpu-buffer,
+  }
+
+  /// GPU-resident pixel-derived edge-discovery output.
+  ///
+  /// This is independent from ground truth: seven ordered discovery dispatches
+  /// inside the current compute pass read the captured-pixel texture, derive
+  /// Sobel-style and frequency-supported edge evidence, and write records into
+  /// this buffer. JavaScript must render it directly and must not decode it into
+  /// a CPU-side drawing path.
+  record analysis-edge-discovery-output {
+    /// Rust-created upstream GPU buffer containing edge-discovery records.
+    buffer: gpu-buffer,
+    /// Rust-created upstream indirect draw arguments for this edge buffer.
+    indirect-buffer: gpu-buffer,
+  }
+
+  /// CPU-readable diagnostic readback descriptor produced by stable P1.
+  ///
+  /// This is diagnostic reporting, not the production discovery path. Rust creates the upstream
+  /// staging buffer, copies the compact summary into it, submits the commands,
+  /// and returns this descriptor so JavaScript can await browser `mapAsync`
+  /// outside the component boundary without a project-owned job resource.
+  record analysis-summary-readback {
+    /// Rust-owned execution plan that sized the summary buffers and dispatch.
+    plan: analysis-plan,
+    /// Rust-created upstream staging buffer containing compact summary bytes
+    /// after the submitted GPU copy completes.
+    staging-buffer: gpu-buffer,
+    /// Exact byte length JavaScript may map from `staging-buffer`.
+    byte-length: u64,
+    /// Submitted upstream command buffer, used only for validation metadata and
+    /// lifetime correlation by the JavaScript host shim.
+    commands: gpu-command-buffer,
+  }
+
+  /// Stable component dispatch result.
+  ///
+  /// Stable P1 remains JSPI-free for the diagnostic summary by returning a
+  /// CPU-readable staging-buffer descriptor. GPU output handles preserve
+  /// resource identity; they are not copied visual data.
+  record analysis-dispatch-result {
+    /// Diagnostic summary readback descriptor resolved outside the component.
+    summary: analysis-summary-readback,
+    /// GPU-resident reference-guided diagnostic rectangles.
+    visual: analysis-visual-output,
+    /// GPU-resident reference-guided diagnostic border trace.
+    border-trace: analysis-border-trace-output,
+    /// GPU-resident pixel-derived edge discovery written by the submitted command buffer.
+    edge-discovery: analysis-edge-discovery-output,
+  }
+}

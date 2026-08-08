@@ -1,0 +1,70 @@
+/// Browser-safe analysis-only surface.
+///
+/// This world intentionally excludes the WASI 0.3 async proof interface.
+/// jco currently emits JSPI (`WebAssembly.Suspending`) whenever the component
+/// contains async/future/stream exports, and Safari/Firefox do not support
+/// that API yet. The website loads this world for real inspector behavior.
+world inspector-analysis {
+  import host-log;
+  import host-events;
+
+  export analysis;
+}
+
+/// Browser-safe GPU analysis surface.
+///
+/// This world is separate from `inspector-analysis` so P1 GPU handle crossing
+/// can evolve without destabilizing the existing CPU/tree analysis component.
+/// It also excludes the WASI 0.3 async proof interface: the compatibility GPU
+/// analyzer starts work synchronously and lets the JavaScript host await browser
+/// WebGPU promises such as the optional one-way diagnostic `mapAsync` summary
+/// readback.
+world inspector-gpu-analysis {
+  import host-log;
+  import host-events;
+  import host-gpu;
+
+  export gpu-analysis;
+}
+
+/// Chrome/JSPI-only GPU analysis surface.
+///
+/// This world is a sibling of `inspector-gpu-analysis`, not a replacement.
+/// It exists to prove jco's async import/export path for diagnostic analyzer
+/// work in browsers that expose JSPI. Safari and Firefox must keep using the
+/// browser-safe worlds. Its direct async return decodes only the compact
+/// diagnostic summary in Rust after upstream `gpu-buffer.map-async`;
+/// reference-guided diagnostic visual output still uses GPU-resident resources.
+world inspector-gpu-analysis-async {
+  import host-log;
+  import host-events;
+  import host-gpu;
+
+  export gpu-analysis-async;
+}
+
+/// Scheduler-owned shared-frame GPU analysis surface.
+///
+/// This world is deliberately separate from both existing GPU worlds. The
+/// browser scheduler creates the command encoder and submits it exactly once;
+/// Rust may only append analyzer commands through a borrowed encoder handle.
+/// Keeping this contract in its own world makes the ownership experiment
+/// removable without changing the stable or JSPI component lifecycles.
+world inspector-gpu-analysis-frame {
+  import host-log;
+  import host-events;
+  import host-gpu;
+
+  export gpu-analysis-frame;
+}
+
+/// The component's full surface: what it needs from the website host
+/// (logging, event push) and what it offers (the real analysis interface plus
+/// the isolated WASI 0.3 async proof harness).
+world inspector-component {
+  import host-log;
+  import host-events;
+
+  export analysis;
+  export wasi-async-proofs;
+}

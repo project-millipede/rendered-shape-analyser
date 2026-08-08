@@ -1,0 +1,27 @@
+/// GPU analysis orchestration export.
+///
+/// This surface is the P1 Component Model path for the WebGPU analyzer. It
+/// receives only opaque host resource handles plus dispatch metadata; it does
+/// not receive DOM/CSS/React data or copied pixels.
+interface gpu-analysis {
+  use host-gpu.{analysis-dispatch, analysis-dispatch-result};
+  use wasi:webgpu/webgpu@0.0.1.{gpu-buffer, gpu-device, gpu-texture};
+
+  /// Start one per-component statistics analysis dispatch.
+  ///
+  /// Rust validates the metadata, builds the analysis plan, creates upstream
+  /// shader-module, layout, pipeline, summary-buffer, and visual-buffer
+  /// resources through `wasi:webgpu`, asks the host to bind those resources,
+  /// encodes commands, submits commands, and returns a diagnostic-summary
+  /// staging-buffer descriptor. The returned reference-guided diagnostic
+  /// outputs are upstream GPU buffer handles, not copied visual data. The host owns all browser WebGPU
+  /// objects; Rust owns the workflow order and analyzer buffer sizes. The
+  /// summary is one-way reporting/evaluation data, not the pixel-derived
+  /// production discovery path.
+  analyze: func(
+    device: borrow<gpu-device>,
+    texture: borrow<gpu-texture>,
+    truth-buffer: borrow<gpu-buffer>,
+    request: analysis-dispatch,
+  ) -> analysis-dispatch-result;
+}

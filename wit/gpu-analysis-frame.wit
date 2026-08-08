@@ -1,0 +1,67 @@
+/// Scheduler-owned shared-frame GPU analysis orchestration.
+///
+/// Unlike `gpu-analysis`, this interface neither creates a command encoder nor
+/// submits a command buffer. The browser lends its still-open frame encoder to
+/// Rust, Rust appends compute and summary-copy commands synchronously, and the
+/// browser appends rendering before making one queue submission.
+interface gpu-analysis-frame {
+  use host-gpu.{
+    analysis-border-trace-output,
+    analysis-dispatch,
+    analysis-edge-discovery-output,
+    analysis-plan,
+    analysis-visual-output,
+  };
+  use wasi:webgpu/webgpu@0.0.1.{
+    gpu-buffer,
+    gpu-command-encoder,
+    gpu-device,
+    gpu-texture,
+  };
+
+  /// Compact diagnostic summary resources whose copy has only been encoded.
+  ///
+  /// The browser must not map `staging-buffer` until it has successfully
+  /// finished and submitted the scheduler-owned frame command buffer.
+  record analysis-frame-summary {
+    /// Rust-owned plan that sized and encoded the summary buffers.
+    plan: analysis-plan,
+    /// CPU-readable staging buffer targeted by the encoded summary copy.
+    staging-buffer: gpu-buffer,
+    /// Exact byte length copied into `staging-buffer`.
+    byte-length: u64,
+  }
+
+  /// GPU outputs encoded into the scheduler's still-open frame.
+  record encoded-analysis-frame {
+    /// Pending compact summary descriptor resolved after browser submission.
+    summary: analysis-frame-summary,
+    /// GPU-resident reference-guided diagnostic rectangle output.
+    visual: analysis-visual-output,
+    /// GPU-resident reference-guided diagnostic border trace.
+    border-trace: analysis-border-trace-output,
+    /// GPU-resident pixel-derived edge discovery and wavelet output.
+    edge-discovery: analysis-edge-discovery-output,
+  }
+
+  /// Append one analyzer dispatch to the browser scheduler's command encoder.
+  ///
+  /// # Critical scheduler-ownership invariant
+  ///
+  /// `encoder` is borrowed from the browser scheduler. Borrowing restricts its
+  /// lifetime and retention; it does not by itself remove state-changing
+  /// WebGPU methods.
+  ///
+  /// Rust must only append analysis commands. It must not finish this encoder,
+  /// create a command buffer from it, or submit that command buffer. The
+  /// browser remains the sole owner of rendering, finishing, and submission.
+  /// Returned buffers become usable only after the browser appends its render
+  /// pass, finishes this same encoder, and submits the resulting command buffer.
+  encode: func(
+    encoder: borrow<gpu-command-encoder>,
+    device: borrow<gpu-device>,
+    texture: borrow<gpu-texture>,
+    truth-buffer: borrow<gpu-buffer>,
+    request: analysis-dispatch,
+  ) -> encoded-analysis-frame;
+}

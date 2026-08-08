@@ -1,0 +1,22 @@
+/// Structured logging from the wasm guest to the website host.
+///
+/// The component targets `wasm32-unknown-unknown` and therefore has no
+/// WASI stderr — this interface is the only way guest text (including
+/// panic messages) reaches a console. The host attributes each line to
+/// the component in its diagnostics output.
+interface host-log {
+  /// Severity of a log line, mapped by the host onto console levels.
+  enum level {
+    /// Verbose detail, hidden by default.
+    debug,
+    /// Normal operational message.
+    info,
+    /// Unexpected but recoverable situation.
+    warn,
+    /// Failure; also used by the guest panic hook.
+    error,
+  }
+
+  /// Write one log line attributed to the wasm component.
+  log: func(lvl: level, msg: string);
+}

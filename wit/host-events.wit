@@ -1,0 +1,9 @@
+/// Event push from the wasm guest to the website host.
+///
+/// The host re-dispatches each emission as a DOM `CustomEvent` named
+/// `wgi:<name>` with the JSON payload as `detail`, so page scripts can
+/// observe guest activity without importing the host package.
+interface host-events {
+  /// Emit a named event with a JSON-serialized payload.
+  emit: func(name: string, payload-json: string);
+}
