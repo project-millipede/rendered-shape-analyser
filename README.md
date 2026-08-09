@@ -1,6 +1,14 @@
-# inspector-component
+# Rendered Shape Analyser
 
-The Rust guest of the `millipede:inspector` Component Model boundary. C0
+A Rust WebAssembly Component for GPU-resident discovery and reference-guided
+evaluation of structure in rendered UI pixels.
+
+The Rust crate and generated artifact basename remain `inspector-component`,
+the local npm package remains `@millipede/inspector-component`, and the WIT
+contract remains `millipede:inspector`.
+
+The Rust guest and authored browser loader implement the
+`millipede:inspector` Component Model boundary. C0
 proved GPU-free, bidirectional host↔guest communication with the
 millipede-docs website; P1 adds a separate GPU-analysis world that drives the
 existing WebGPU analyzer path through upstream `wasi:webgpu` resource handles
@@ -12,8 +20,10 @@ live in the website repo under
 
 **`wit/` is the source of truth for the boundary.** Start with
 `wit/world.wit`, then follow the split interface files. Every interface,
-record, field, and function is doc-commented there. This crate implements it;
-the website package `packages/surface/inspector-wasm-host` hosts it.
+record, field, and function is doc-commented there. The Rust crate implements
+the guest exports, `component-loader/` supplies the browser host, and the
+website package `packages/surface/inspector-wasm-host` consumes the root
+package.
 
 ## Layout
 
@@ -24,7 +34,7 @@ the website package `packages/surface/inspector-wasm-host` hosts it.
 | `wkg/`                              | isolated `wkg` config, lockfile, and temporary local `wasi:webgpu` override                                               |
 | `xtask/`                            | Rust task runner for WIT dependency fetch/check policy                                                                    |
 | `src/lib.rs`                        | tiny crate entrypoint and component export wiring                                                                         |
-| `src/wit/`                          | raw `wit-bindgen` output; domain modules should use local binding views                                                   |
+| `src/wit/`                          | feature-selected `wit-bindgen` generation boundary; domain modules use local binding views                                |
 | `src/shared/`                       | shared component type and runtime helpers                                                                                 |
 | `src/analysis/`                     | product-facing analysis interface and aggregate math                                                                      |
 | `src/edge_discovery/`               | pixel-derived edge-discovery planning, buffers, pipelines, command encoding, and separated Rust-owned WGSL fragments      |
@@ -42,22 +52,22 @@ the website package `packages/surface/inspector-wasm-host` hosts it.
 | `target/component/`                 | disposable component `.wasm` build output consumed by jco                                                                 |
 | `target/component-tests/`           | disposable typed-host build and jco output used only by the Vitest component-boundary suite                               |
 | `scripts/build.sh`                  | cargo → `wasm-tools component new` → `target/component/` → world verification                                             |
-| `scripts/check-ts-imports.mjs`      | guard for extensionless authored TypeScript imports in `component-loader/src/`                                            |
-| `scripts/sync.sh`                   | website transpile → writes `pkg/generated/`                                                                               |
+| `scripts/check-ts-imports.mjs`      | authored-loader policy guard for imports, generated-module access, and explicit boundary types                            |
+| `scripts/sync.sh`                   | stage all five JCO worlds, replace `pkg/generated/` after all transpiles succeed, then rebuild the loader                 |
 
 ## Commands
 
 ```sh
-npm run build   # compile Rust and lift all worlds into Wasm Components
-npm run wit:fetch   # xtask: refresh wit/deps/ through wkg/
-npm run wit:check   # xtask: assert committed WIT deps match wkg output
-npm run loader:build   # compile component-loader/src TypeScript to component-loader/dist
-npm run test:typecheck   # strict-check the typed component-boundary test host and specs
-npm run test:unit   # run typed test-host unit tests without loading a component
-npm run test:integration   # transpile and test all five real generated component worlds
-npm run test:all   # run the unit and integration categories together
-npm test   # typecheck, then run both component-boundary test categories
-npm run sync    # transpile against the package host modules and write pkg/generated/
+pnpm run build   # compile Rust and lift all worlds into Wasm Components
+pnpm run wit:fetch   # xtask: refresh wit/deps/ through wkg/
+pnpm run wit:check   # xtask: assert committed WIT deps match wkg output
+pnpm run loader:build   # compile component-loader/src TypeScript to component-loader/dist
+pnpm run test:typecheck   # strict-check the typed component-boundary test host and specs
+pnpm run test:unit   # run typed test-host unit tests without loading a component
+pnpm run test:integration   # transpile and test all five real generated component worlds
+pnpm run test:all   # run the unit and integration categories together
+pnpm test   # typecheck, then run both component-boundary test categories
+pnpm run sync    # transpile against the package host modules and write pkg/generated/
 cargo test      # stats math + committed wasi:webgpu async WIT guard
 cargo doc --no-deps   # rustdoc — must stay warning-free (#![warn(missing_docs)])
 ```
@@ -70,26 +80,28 @@ The short rule: `target/*` is scratch, while `component-loader/dist/` and
 `pkg/generated/` are generated package payload and are recreated locally.
 
 Authored loader TypeScript uses extensionless relative imports. The build
-enforces this with `npm run loader:check-imports`; `tsup` is responsible for
-emitting runtime JavaScript module specifiers in `component-loader/dist/`.
+enforces this with `pnpm run loader:check-imports`; the same policy rejects
+broad `unknown`/`any` types and indexed-access type derivation in maintained
+loader source. `tsup` is responsible for emitting runtime JavaScript module
+specifiers in `component-loader/dist/`.
 Generated component imports go through `component-loader/src/generated.ts`;
 do not introduce package-private `#generated/*` aliases.
 The adapter exposes explicit facade interfaces; avoid indexed-access type
 helpers and type assertions at this boundary.
 
-## Pinned toolchain (recorded 2026-08-08)
+## Recorded toolchain baseline (2026-08-08)
 
-| Tool                    | Version                     | Note                                                                            |
-| ----------------------- | --------------------------- | ------------------------------------------------------------------------------- |
-| Rust                    | stable 1.96.0               | pinned via `rust-toolchain.toml` (machine default stays nightly)                |
-| `wit-bindgen`           | 0.60.0                      | guest bindings; `generate!` in `src/wit/generated.rs`                           |
-| `wasm-tools`            | 1.251.0                     | componentization + world verification                                           |
-| `wkg`                   | 0.15.1                      | WIT dependency fetch/check; config isolated in `wkg/`                           |
-| `@bytecodealliance/jco` | ^1.27.0                     | Resolves to 1.27.0; generated files are used as emitted                         |
-| `@webgpu/types`         | ^0.1.71                     | TypeScript host shim types for browser WebGPU objects                           |
-| Node                    | 24.15.0                     | typed component-boundary unit and integration runtime                           |
-| WIT package             | `millipede:inspector@0.1.0` | import specifiers are versioned — `--map` keys carry `@0.1.0`                   |
-| WIT dependency          | `wasi:webgpu@0.0.1`         | fetched with `wkg`; temporary local override until the public registry resolves |
+| Tool                    | Version                     | Note                                                                                         |
+| ----------------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
+| Rust                    | stable (1.96.0 recorded)    | `rust-toolchain.toml` selects the floating stable channel; the machine default stays nightly |
+| `wit-bindgen`           | 0.60.0                      | guest bindings; `generate!` in `src/wit/generated.rs`                                        |
+| `wasm-tools`            | 1.251.0                     | componentization + world verification                                                        |
+| `wkg`                   | 0.15.1                      | WIT dependency fetch/check; config isolated in `wkg/`                                        |
+| `@bytecodealliance/jco` | ^1.27.0                     | Resolves to 1.27.0; generated files are used as emitted                                      |
+| `@webgpu/types`         | ^0.1.71                     | TypeScript host shim types for browser WebGPU objects                                        |
+| Node                    | 24.15.0                     | typed component-boundary unit and integration runtime                                        |
+| WIT package             | `millipede:inspector@0.1.0` | import specifiers are versioned — `--map` keys carry `@0.1.0`                                |
+| WIT dependency          | `wasi:webgpu@0.0.1`         | fetched with `wkg`; temporary local override until the public registry resolves              |
 
 ### JCO usage: transpile, not componentize
 
@@ -127,12 +139,14 @@ is already a WebAssembly Component before JCO is invoked.
 the generated browser package:
 
 ```sh
-jco transpile \
+npx jco transpile \
   target/component/inspector-component.analysis.wasm \
   -o pkg/generated/analysis \
   --name inspector-component \
   --map \
     'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
+  --map \
+    'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --base64-cutoff 0 \
   --no-namespaced-exports
 ```
@@ -212,9 +226,10 @@ Upstream documentation:
 
 ## Design notes (the short version)
 
-- **Target `wasm32-unknown-unknown`** — zero WASI imports, so the browser
-  needs no shim; panics are routed to the host via the `host-log` import
-  (there is no WASI stderr).
+- **Target `wasm32-unknown-unknown`** — the Rust target introduces no WASI
+  runtime or libc imports, so the browser needs no general WASI shim. GPU
+  worlds deliberately import the mapped `wasi:webgpu` component interface;
+  panics are routed to the host via `host-log` because there is no WASI stderr.
 - **Package boundary** — the root npm package exports the compiled
   `component-loader/dist/` API, and jco's direct-ESM mode + `--map` wires the
   component's imports onto `component-loader/dist/host/*.js`; `--base64-cutoff 0`
@@ -223,16 +238,16 @@ Upstream documentation:
   build input for jco. The website consumes this repo through pnpm instead of
   owning copied generated files.
 - **Generated browser entrypoints are intentionally split** — `analysis` is
-  transpiled from an analysis-only world and has no JSPI dependency, so it
-  works in Safari, Firefox, Chrome, and Edge. `gpu-analysis` is the stable P1
+  transpiled from an analysis-only world and has no JSPI dependency, so it is
+  the browser-safe entrypoint. `gpu-analysis` is the stable P1
   browser-safe WebGPU handle world; it returns an explicit diagnostic
-  staging-buffer readback descriptor plus GPU-resident reference-guided
-  diagnostic rectangle and border handles, and lets JS perform the current
-  diagnostic contract's browser `mapAsync`
-  outside the component. Production discovery should not require that readback.
+  staging-buffer readback descriptor plus six GPU-resident visual,
+  border-trace, and edge-discovery output/indirect handles, and lets JS perform
+  the current diagnostic contract's browser `mapAsync` outside the component.
+  Production discovery should not require that readback.
   `gpu-analysis-async` is a Chrome/JSPI-only diagnostic compatibility
   experiment; it awaits the host dispatch and returns the compact diagnostic
-  summary plus the same GPU-resident diagnostic handles directly.
+  summary plus the same six GPU-resident output handles directly.
   `gpu-analysis-frame` is a separate browser-safe experiment: its generated
   Rust bindings can express `finish()` and queue access, so borrowing alone is
   not the ownership guarantee. The current compiled frame artifact omits those
@@ -249,7 +264,7 @@ Upstream documentation:
   separate learning harness for WASI 0.3 async behavior.
 - **WIT package dependencies are managed by `wkg/` plus `xtask`** —
   `wit/deps/` is generated from `wkg/wkg.toml` and checked by
-  `npm run wit:check`. `xtask` runs `wkg` from the isolated `wkg/` folder and
+  `pnpm run wit:check`. `xtask` runs `wkg` from the isolated `wkg/` folder and
   verifies the required async `wasi:webgpu` signatures in Rust, not shell. The
   local `wasi:webgpu` override exists only because `wasi:webgpu@0.0.1` is not
   currently reachable through the default registry from this machine.
@@ -258,13 +273,17 @@ Upstream documentation:
   Rendering-only backends such as WebGL2 and OpenGL ES 3.0 are outside that
   support floor. The complete platform-independent rule is recorded in the
   [GPU compute execution contract](docs/architecture/gpu-compute-execution-contract.md).
-- **Shader source is separated plain WGSL** — edge-discovery WGSL lives as
-  Rust-owned fragments next to each analyzer concern:
-  `frequency_separation/shaders.rs`, `refiner/shaders.rs`,
-  `wavelet/haar/shaders.rs`, and `grouping/shaders.rs`. The root
-  `src/edge_discovery/shaders.rs` only assembles those fragments for
-  `GPUDevice.createShaderModule`. WGSL is the browser/runtime contract; no
-  shader authoring/linking layer sits between Rust and browser WGSL.
+- **Shader source is hybrid WGSL assembled during workload preparation** —
+  edge-discovery shader source lives next to each analyzer concern in
+  `frequency_separation/shader.wgsl`, `refiner/shaders.rs`,
+  `wavelet/haar/shader.wgsl`, and `grouping/shaders.rs`.
+  `src/edge_discovery/shaders.rs` uses `wgsl-macro::ShaderProcessor` to expand
+  imports, substitute Rust-owned constants, and build the final WGSL string
+  passed to `GPUDevice.createShaderModule`; reference-guided diagnostics remain
+  a Rust string in `src/reference_diagnostics/pipelines.rs`. WGSL remains the
+  browser/runtime contract. Moving this assembly to build time is documented
+  separately in the
+  [portable shader-toolchain investigation](docs/future-directions/portable-shader-toolchain/README.md).
 - **WASI async proofs are isolated** — `wasi-async-proofs` exists only to
   learn and verify `async func`, `future<T>`, and `stream<T>` through jco.
   The transpile scripts use JSPI plus explicit async-export names for the
@@ -284,8 +303,8 @@ Upstream documentation:
   `gpu-pipeline-layout`, `gpu-compute-pipeline`, `gpu-bind-group`,
   `gpu-command-encoder`, `gpu-compute-pass-encoder`, `gpu-command-buffer`,
   and `gpu-queue`, then adds only the project-specific analyzer dispatch,
-  diagnostic-readback record, visual-output record, and workflow records in
-  `host-gpu.wit`.
+  diagnostic-readback, visual-output, border-trace-output,
+  edge-discovery-output, and workflow records in `host-gpu.wit`.
   Rust already calls the upstream `gpu-texture.width()`,
   `gpu-texture.height()`, and `gpu-buffer.size()` methods to validate the
   request against the actual registered browser texture and ground-truth
@@ -297,8 +316,9 @@ Upstream documentation:
   encodes commands through upstream command encoder/compute-pass methods. The
   stable and async worlds submit through
   `gpu-device.queue().submit(...)`; the frame world deliberately leaves its
-  scheduler-owned encoder open. The stable world returns the compact diagnostic
-  staging-buffer descriptor to the JS loader for readback.
+  scheduler-owned encoder unfinished and unsubmitted. The stable world returns
+  the compact diagnostic staging-buffer descriptor to the JS loader for
+  readback.
   The website host maps those upstream operations onto the browser's existing
   shared `GPUDevice`; P0 is only the oracle/compare backend.
   Those handles are backed by the website's browser objects; Rust never
@@ -337,8 +357,10 @@ Upstream documentation:
   already carries that context.
 - **Async GPU analysis is experimental and gated** — `gpu-analysis-async`
   exists to exercise the Chrome/JSPI diagnostic compatibility path without
-  replacing `gpu-analysis`. The website must probe JSPI support before loading it, and
-  Safari/Firefox stay on `webgpu-baseline` or the stable `component-gpu` path.
+  replacing `gpu-analysis`. The website must probe for
+  `WebAssembly.Suspending` and `WebAssembly.promising` before loading it;
+  runtimes without JSPI stay on `webgpu-baseline` or the stable
+  `component-gpu` path.
   This async world uses upstream `wasi:webgpu` async operations for
   `gpu-queue.on-submitted-work-done` and `gpu-device.pop-error-scope`, with a
   preceding sync `gpu-device.push-error-scope`. The loader returns an
