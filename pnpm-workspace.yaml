@@ -1,0 +1,10 @@
+# Why esbuild may run its install script:
+#
+# 1. tsup uses esbuild as the loader's bundling engine.
+# 2. Esbuild requires an OS/CPU-specific native executable.
+# 3. Its postinstall validates that executable and installs a fallback when the
+#    optional platform package is unavailable.
+# 4. pnpm blocks dependency lifecycle scripts unless explicitly approved;
+#    `true` approves this installation step for esbuild only.
+allowBuilds:
+  esbuild: true

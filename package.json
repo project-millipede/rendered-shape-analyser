@@ -1,0 +1,45 @@
+{
+  "name": "@millipede/inspector-component",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local loader for the millipede inspector WebAssembly Component Model guest.",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "main": "./component-loader/dist/index.js",
+  "types": "./component-loader/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./component-loader/dist/index.d.ts",
+      "default": "./component-loader/dist/index.js"
+    }
+  },
+  "files": [
+    "component-loader/dist",
+    "pkg/generated"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "npm run test:typecheck && npm run test:all",
+    "test:typecheck": "node tests/component-boundary/scripts/prepare.ts --host-only && node node_modules/typescript/bin/tsc -p tests/component-boundary/tsconfig.json --noEmit",
+    "test:unit": "node tests/component-boundary/scripts/run-vitest.mjs unit",
+    "test:integration": "node tests/component-boundary/scripts/run-vitest.mjs integration",
+    "test:all": "node tests/component-boundary/scripts/run-vitest.mjs all",
+    "build": "npm run wit:fetch && scripts/build.sh",
+    "loader:build": "npm run loader:check-imports && npm run loader:typecheck && tsup --config component-loader/tsup.config.ts",
+    "loader:check-imports": "node scripts/check-ts-imports.mjs",
+    "loader:typecheck": "tsc -p component-loader/tsconfig.json --noEmit",
+    "sync": "scripts/sync.sh",
+    "wit:check": "cargo run -p inspector-component-xtask -- wit check",
+    "wit:fetch": "cargo run -p inspector-component-xtask -- wit fetch"
+  },
+  "devDependencies": {
+    "@bytecodealliance/jco": "^1.27.0",
+    "@types/node": "26.1.2",
+    "@webgpu/types": "^0.1.71",
+    "tsup": "^8.5.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}
