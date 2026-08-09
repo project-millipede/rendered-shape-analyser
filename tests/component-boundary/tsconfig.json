@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node", "vitest/globals", "@webgpu/types"],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "assertions/**/*.ts",
+    "fixtures/**/*.ts",
+    "host/**/*.ts",
+    "support/**/*.ts",
+    "integration/**/*.ts",
+    "unit/**/*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["../../target/component-tests"]
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "noEmit": false,
+    "outDir": "../../target/component-tests/host",
+    "rootDir": "./host",
+    "sourceMap": true
+  },
+  "include": ["host/**/*.ts"],
+  "exclude": []
+}
