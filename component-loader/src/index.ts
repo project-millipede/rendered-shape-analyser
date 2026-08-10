@@ -1,19 +1,21 @@
 import {
-  importAnalysisGeneratedModule,
-  importGpuAnalysisAsyncGeneratedModule,
-  importGpuAnalysisGeneratedModule,
-  importWasiAsyncProofsGeneratedModule,
-  type AnalysisGeneratedModule,
+  instantiateAnalysisComponent,
+  instantiateGpuAnalysisAsyncComponent,
+  instantiateGpuAnalysisComponent,
+  instantiateWasiAsyncProofsComponent,
   type AnalysisInterface,
-  type GpuAnalysisAsyncGeneratedModule,
   type GpuAnalysisAsyncInterface,
-  type GpuAnalysisGeneratedModule,
   type GpuAnalysisInterface,
   type NodeRecord,
   type TreeStats,
-  type WasiAsyncProofsGeneratedModule,
   type WasiAsyncProofsInterface,
 } from "./generated";
+import {
+  createComponentCapabilityController,
+  createComponentCapabilityLoaderView,
+  type ComponentCapabilityLoader,
+  type ComponentCapabilitySupport,
+} from "./capability";
 import {
   configureGpuAnalysisSummaryResolver,
   expectedEdgeDiscoverySlotCapacity,
@@ -48,40 +50,6 @@ import type {
   RegisteredGpuBufferHandle,
 } from "./host/gpu";
 
-/** Memoized generated analysis module import; instantiated once per page. */
-let analysisModulePromise: Promise<AnalysisGeneratedModule | null> | undefined;
-
-/** Memoized generated WASI 0.3 proof module import; instantiated once per page. */
-let wasiAsyncProofsModulePromise:
-  | Promise<WasiAsyncProofsGeneratedModule | null>
-  | undefined;
-
-/** Memoized generated GPU-analysis module import; instantiated once per page. */
-let gpuAnalysisModulePromise:
-  | Promise<GpuAnalysisGeneratedModule | null>
-  | undefined;
-
-/** Memoized generated async GPU-analysis module import; instantiated once per page. */
-let gpuAnalysisAsyncModulePromise:
-  | Promise<GpuAnalysisAsyncGeneratedModule | null>
-  | undefined;
-
-/** Memoized real inspector API view. */
-let analysisPromise: Promise<AnalysisInterface | null> | undefined;
-
-/** Memoized WASI 0.3 async proof API view. */
-let wasiAsyncProofsPromise:
-  | Promise<WasiAsyncProofsInterface | null>
-  | undefined;
-
-/** Memoized GPU-analysis API view. */
-let gpuAnalysisPromise: Promise<GpuAnalysisInterface | null> | undefined;
-
-/** Memoized async GPU-analysis API view. */
-let gpuAnalysisAsyncPromise:
-  | Promise<GpuAnalysisAsyncInterface | null>
-  | undefined;
-
 /** Parent sentinel marking a root node. */
 export const NO_PARENT = 0xffffffff;
 
@@ -109,6 +77,12 @@ export type {
   NodeRecord,
   TreeStats,
 };
+export type {
+  ComponentCapabilityLoader,
+  ComponentCapabilityPrepareResult,
+  ComponentCapabilityState,
+  ComponentUnsupportedReason,
+} from "./capability";
 export type GuestLogLevel = "debug" | "info" | "warn" | "error";
 
 export {
@@ -123,11 +97,10 @@ export {
 // synchronous borrowed-encoder lifecycle must not leak into stable/JSPI code.
 export {
   encodeComponentGpuFrameAnalysis,
+  componentGpuFrameAnalyzerLoader,
   loadComponentGpuFrameAnalyzer,
 } from "./frame";
-export type {
-  GpuAnalysisFrameInterface,
-} from "./generated";
+export type { GpuAnalysisFrameInterface } from "./generated";
 export type {
   ComponentGpuFrameEncodedOutput,
   ComponentGpuFramePendingSummary,
@@ -347,14 +320,108 @@ const withComponentGpuAnalysisScope = async <Result>(
   }
 };
 
+/** Classify baseline WebAssembly support without starting component work. */
+const probeWebAssemblySupport = (): ComponentCapabilitySupport => {
+  const wasm = globalThis.WebAssembly;
+  if (typeof wasm === "object" && wasm !== null) {
+    return { status: "supported" };
+  }
+  return {
+    status: "unsupported",
+    reason: {
+      code: "webassembly-unavailable",
+      message: "WebAssembly is unavailable in this runtime",
+    },
+  };
+};
+
+/** Classify JSPI support for the two explicitly asynchronous worlds. */
+const probeJspiSupport = (): ComponentCapabilitySupport => {
+  if (supportsJspiComponents()) return { status: "supported" };
+  return {
+    status: "unsupported",
+    reason: {
+      code: "jspi-unavailable",
+      message:
+        "WebAssembly.Suspending and WebAssembly.promising are unavailable",
+    },
+  };
+};
+
+/** Browser-safe analysis lifecycle behind the nullable compatibility API. */
+const analysisComponentController = createComponentCapabilityController({
+  instantiate: instantiateAnalysisComponent,
+  probeSupport: probeWebAssemblySupport,
+  reportFailure(error) {
+    console.info(
+      "[analysis][inspector-component] component failed to instantiate; wasm APIs disabled",
+      error,
+    );
+  },
+});
+
+/** Explicit lifecycle for the browser-safe analysis capability. */
+export const analysisComponentLoader: ComponentCapabilityLoader<AnalysisInterface> =
+  createComponentCapabilityLoaderView(analysisComponentController);
+
+/** Stable GPU-analysis lifecycle behind the nullable compatibility API. */
+const componentGpuAnalyzerController = createComponentCapabilityController({
+  instantiate: instantiateGpuAnalysisComponent,
+  probeSupport: probeWebAssemblySupport,
+  reportFailure(error) {
+    console.info(
+      "[analysis][component-gpu] component failed to instantiate; wasm APIs disabled",
+      error,
+    );
+  },
+});
+
+/** Explicit lifecycle for the stable GPU-analysis capability. */
+export const componentGpuAnalyzerLoader: ComponentCapabilityLoader<GpuAnalysisInterface> =
+  createComponentCapabilityLoaderView(componentGpuAnalyzerController);
+
+/** JSPI GPU-analysis lifecycle behind the nullable compatibility API. */
+const componentGpuAnalyzerAsyncController = createComponentCapabilityController(
+  {
+    instantiate: instantiateGpuAnalysisAsyncComponent,
+    probeSupport: probeJspiSupport,
+    reportFailure(error) {
+      console.info(
+        "[analysis][component-gpu-async] component failed to instantiate; wasm APIs disabled",
+        error,
+      );
+    },
+  },
+);
+
+/** Explicit lifecycle for the JSPI GPU-analysis capability. */
+export const componentGpuAnalyzerAsyncLoader: ComponentCapabilityLoader<GpuAnalysisAsyncInterface> =
+  createComponentCapabilityLoaderView(componentGpuAnalyzerAsyncController);
+
+/** WASI async-proof lifecycle behind the nullable compatibility API. */
+const wasiAsyncProofsComponentController = createComponentCapabilityController({
+  instantiate: instantiateWasiAsyncProofsComponent,
+  probeSupport: probeJspiSupport,
+  reportFailure(error) {
+    console.info(
+      "[wasi-0.3][inspector-component] component failed to instantiate; wasm APIs disabled",
+      error,
+    );
+  },
+});
+
+/** Explicit lifecycle for the isolated WASI async-proof capability. */
+export const wasiAsyncProofsComponentLoader: ComponentCapabilityLoader<WasiAsyncProofsInterface> =
+  createComponentCapabilityLoaderView(wasiAsyncProofsComponentController);
+
 /**
  * Load and instantiate the browser-safe analysis component.
+ *
+ * @returns The callable analysis interface, or `null` when the compatibility
+ *   view does not reach the loader's ready state.
  */
 export function loadAnalysisComponent(): Promise<AnalysisInterface | null> {
-  analysisPromise ??= importAnalysisModule().then(
-    (module) => module?.analysis ?? null,
-  );
-  return analysisPromise;
+  return analysisComponentController.prepareNullable();
 }
 
 /**
@@ -364,14 +431,11 @@ export function loadAnalysisComponent(): Promise<AnalysisInterface | null> {
  * the P1 host-gpu resource world and should only be used by the WebGPU
  * analyzer backend.
  *
- * @returns The guest's `gpu-analysis` interface, or `null` when wasm
- *   compilation/instantiation failed at runtime.
+ * @returns The guest's `gpu-analysis` interface, or `null` when the
+ *   compatibility view does not reach the loader's ready state.
  */
 export function loadComponentGpuAnalyzer(): Promise<GpuAnalysisInterface | null> {
-  gpuAnalysisPromise ??= importGpuAnalysisModule().then(
-    (module) => module?.gpuAnalysis ?? null,
-  );
-  return gpuAnalysisPromise;
+  return componentGpuAnalyzerController.prepareNullable();
 }
 
 /**
@@ -408,18 +472,11 @@ export function supportsComponentGpuAnalyzerAsync(): boolean {
  * the experimental async host-gpu world and is unavailable in browsers without
  * JSPI support.
  *
- * @returns The guest's `gpu-analysis-async` interface, or `null` when JSPI is
- *   unavailable or wasm compilation/instantiation failed at runtime.
+ * @returns The guest's `gpu-analysis-async` interface, or `null` when the
+ *   compatibility view does not reach the loader's ready state.
  */
 export function loadComponentGpuAnalyzerAsync(): Promise<GpuAnalysisAsyncInterface | null> {
-  if (!gpuAnalysisAsyncPromise) {
-    gpuAnalysisAsyncPromise = supportsComponentGpuAnalyzerAsync()
-      ? importGpuAnalysisAsyncModule().then(
-          (module) => module?.gpuAnalysisAsync ?? null,
-        )
-      : Promise.resolve(null);
-  }
-  return gpuAnalysisAsyncPromise;
+  return componentGpuAnalyzerAsyncController.prepareNullable();
 }
 
 /**
@@ -443,7 +500,8 @@ export function loadComponentGpuAnalyzerAsync(): Promise<GpuAnalysisAsyncInterfa
 export async function runComponentGpuAnalysis(
   input: ComponentGpuAnalysisInput,
 ): Promise<ComponentGpuAnalysisOutput> {
-  const gpuAnalysis = await loadComponentGpuAnalyzer();
+  let gpuAnalysis = componentGpuAnalyzerController.getReadyCapability();
+  if (!gpuAnalysis) gpuAnalysis = await loadComponentGpuAnalyzer();
   if (!gpuAnalysis) {
     throw new Error("[analysis][component-gpu] component failed to load");
   }
@@ -456,7 +514,10 @@ export async function runComponentGpuAnalysis(
       truthBuffer,
       createComponentGpuAnalysisDispatch(input),
     );
-    scope.trackSummaryReadback(result.summary.stagingBuffer, result.summary.commands);
+    scope.trackSummaryReadback(
+      result.summary.stagingBuffer,
+      result.summary.commands,
+    );
     const visual = scope.trackVisualOutput(
       result.visual.buffer,
       result.visual.indirectBuffer,
@@ -518,7 +579,8 @@ export async function runComponentGpuAnalysis(
 export async function runComponentGpuAnalysisAsync(
   input: ComponentGpuAnalysisInput,
 ): Promise<ComponentGpuAnalysisOutput> {
-  const gpuAnalysis = await loadComponentGpuAnalyzerAsync();
+  let gpuAnalysis = componentGpuAnalyzerAsyncController.getReadyCapability();
+  if (!gpuAnalysis) gpuAnalysis = await loadComponentGpuAnalyzerAsync();
   if (!gpuAnalysis) {
     throw new Error(
       "[analysis][component-gpu-async] component failed to load or JSPI unavailable",
@@ -590,78 +652,10 @@ export function supportsWasiAsyncProofs(): boolean {
  * This is deliberately separate from {@link loadAnalysisComponent}: the real
  * inspector API should not grow proof-only methods while we learn the async
  * shapes.
+ *
+ * @returns The callable proof interface, or `null` when the compatibility
+ *   view does not reach the loader's ready state.
  */
 export function loadWasiAsyncProofsComponent(): Promise<WasiAsyncProofsInterface | null> {
-  if (!wasiAsyncProofsPromise) {
-    wasiAsyncProofsPromise = supportsWasiAsyncProofs()
-      ? importWasiAsyncProofsModule().then(
-          (module) => module?.wasiAsyncProofs ?? null,
-        )
-      : Promise.resolve(null);
-  }
-  return wasiAsyncProofsPromise;
-}
-
-async function importAnalysisModule(): Promise<AnalysisGeneratedModule | null> {
-  if (!analysisModulePromise) {
-    analysisModulePromise =
-      importAnalysisGeneratedModule()
-        .catch((error) => {
-          console.info(
-            "[analysis][inspector-component] component failed to instantiate; wasm APIs disabled",
-            error,
-          );
-          return null;
-        });
-  }
-  return analysisModulePromise;
-}
-
-async function importGpuAnalysisModule(): Promise<GpuAnalysisGeneratedModule | null> {
-  if (!gpuAnalysisModulePromise) {
-    gpuAnalysisModulePromise =
-      importGpuAnalysisGeneratedModule()
-        .catch((error) => {
-          console.info(
-            "[analysis][component-gpu] component failed to instantiate; wasm APIs disabled",
-            error,
-          );
-          return null;
-        });
-  }
-  return gpuAnalysisModulePromise;
-}
-
-async function importGpuAnalysisAsyncModule(): Promise<GpuAnalysisAsyncGeneratedModule | null> {
-  if (!gpuAnalysisAsyncModulePromise) {
-    gpuAnalysisAsyncModulePromise =
-      importGpuAnalysisAsyncGeneratedModule()
-        .catch((error) => {
-          console.info(
-            "[analysis][component-gpu-async] component failed to instantiate; wasm APIs disabled",
-            error,
-          );
-          return null;
-        });
-  }
-  return gpuAnalysisAsyncModulePromise;
-}
-
-async function importWasiAsyncProofsModule(): Promise<WasiAsyncProofsGeneratedModule | null> {
-  if (!wasiAsyncProofsModulePromise) {
-    wasiAsyncProofsModulePromise =
-      importWasiAsyncProofsGeneratedModule()
-        // The generated declaration exposes `proveStream` as an
-        // `AsyncIterable<number>` directly. Because sync.sh names that export
-        // in `--async-exports`, the JSPI runtime wrapper returns a Promise
-        // which resolves to the generated async iterable.
-        .catch((error) => {
-          console.info(
-            "[wasi-0.3][inspector-component] component failed to instantiate; wasm APIs disabled",
-            error,
-          );
-          return null;
-        });
-  }
-  return wasiAsyncProofsModulePromise;
+  return wasiAsyncProofsComponentController.prepareNullable();
 }

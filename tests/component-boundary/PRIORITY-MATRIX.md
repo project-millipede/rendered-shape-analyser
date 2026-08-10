@@ -73,6 +73,25 @@ code rather than additional test categories.
 
 ## Unit tests
 
+### `component-capability-state.test.ts`
+
+| Priority | Protected loader behavior                                                        |
+| -------: | -------------------------------------------------------------------------------- |
+|       10 | The pure preparation and retirement transition table remains explicit and legal. |
+|       10 | Ready is entered only by a successful active attempt and reused by normal calls. |
+|       10 | Retry starts only from idle, unsupported, or failed lifecycle outcomes.          |
+|       10 | Disposed absorbs repeated requests and every late preparation outcome.           |
+
+### `component-capability-loader.test.ts`
+
+| Priority | Protected loader behavior                                                         |
+| -------: | --------------------------------------------------------------------------------- |
+|       10 | Concurrent preparation shares one provider attempt and one ready capability.      |
+|       10 | Unsupported and failed outcomes remain typed until an explicit retry.             |
+|       10 | Nullable compatibility loading follows the same current or retried attempt.       |
+|       10 | Disposal quarantines late completion and retires a ready provider exactly once.   |
+|        9 | Disposal is idempotent and private provider ownership never enters ready results. |
+
 ### `host-gpu-readback.test.ts`
 
 | Priority | Protected fake-host behavior                                       |
@@ -98,6 +117,11 @@ code rather than additional test categories.
 3. Generated integration uses one final truth-buffer validation failure per
    public variant. Rust unit tests own pure metadata cases, their precedence,
    and metadata error strings.
+4. Capability state-machine tests are pure transition-table tests. Loader
+   controller tests separately use an injected provider to cover promises and
+   cleanup without generated output. A later real-browser smoke must exercise
+   the authored public loader, current provider adapter, and selected component
+   together.
 
 ## Explicitly excluded
 

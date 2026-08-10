@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
+  },
+  "include": [
+    "unit/component-capability-loader.test.ts",
+    "unit/component-capability-state.test.ts"
+  ],
+  "exclude": []
+}

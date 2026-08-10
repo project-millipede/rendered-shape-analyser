@@ -22,7 +22,7 @@
   "sideEffects": false,
   "scripts": {
     "test": "npm run test:typecheck && npm run test:all",
-    "test:typecheck": "node tests/component-boundary/scripts/prepare.ts --host-only && node node_modules/typescript/bin/tsc -p tests/component-boundary/tsconfig.json --noEmit",
+    "test:typecheck": "node tests/component-boundary/scripts/prepare.ts --host-only && node node_modules/typescript/bin/tsc -p tests/component-boundary/tsconfig.json --noEmit && node node_modules/typescript/bin/tsc -p tests/component-boundary/tsconfig.loader.json --noEmit",
     "test:unit": "node tests/component-boundary/scripts/run-vitest.mjs unit",
     "test:integration": "node tests/component-boundary/scripts/run-vitest.mjs integration",
     "test:all": "node tests/component-boundary/scripts/run-vitest.mjs all",

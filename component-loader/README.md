@@ -41,27 +41,43 @@ That package registers the component backends with
 import path while delegating to this package. Application code should use
 those layers instead of importing this low-level loader directly.
 
-For another host integration, import the package API directly. Loaders are
-memoized and return `null` when a component cannot be instantiated:
+For another host integration, prepare the selected capability explicitly. A
+typed result distinguishes platform support from an unexpected preparation
+failure, and `ready` guarantees that later execution performs no component
+loading:
 
 ```ts
-import { loadAnalysisComponent } from "@millipede/inspector-component";
+import { analysisComponentLoader } from "@millipede/inspector-component";
 
-const analysis = await loadAnalysisComponent();
-if (analysis) {
-  const stats = analysis.analyzeTree(nodes, textureWidth, textureHeight);
+const prepared = await analysisComponentLoader.prepare();
+if (prepared.status === "ready") {
+  const stats = prepared.capability.analyzeTree(
+    nodes,
+    textureWidth,
+    textureHeight,
+  );
 }
 ```
 
+Each selected loader exposes `state`, `prepare()`, `retry()`, and `dispose()`.
+Concurrent preparation calls share one attempt; failure and unsupported states
+remain stable until an explicit retry. The existing `load*()` functions remain
+nullable compatibility views over the same attempt. Page-wide singleton
+loaders should be disposed only during terminal application teardown until the
+later runtime-factory design assigns them a narrower owner. A caller must not
+invoke a capability retained from an earlier ready result after disposal; the
+current generated provider cannot revoke an escaped JavaScript function.
+Active analysis work must settle before that terminal disposal.
+
 ## Choose an execution mode
 
-| World / Millipede mode                       | Purpose                                                         | Requirement         | Lifecycle and public entrypoint                                                                                                                             |
-| -------------------------------------------- | --------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `analysis`                                   | C0 typed non-GPU analysis boundary                              | Browser WebAssembly | `loadAnalysisComponent()`                                                                                                                                   |
-| `gpu-analysis` / `component-gpu`             | Stable P1 GPU execution                                         | WebGPU; no JSPI     | The component finishes and submits; configure `configureGpuAnalysisSummaryResolver()` and call `runComponentGpuAnalysis()`                                  |
-| `gpu-analysis-frame` / `component-gpu-frame` | P1 analysis in a scheduler-owned frame                          | WebGPU; no JSPI     | Preload with `loadComponentGpuFrameAnalyzer()`, then call synchronous `encodeComponentGpuFrameAnalysis()`; the browser scheduler alone finishes and submits |
-| `gpu-analysis-async` / `component-gpu-async` | Experimental P1 async/readback path                             | WebGPU plus JSPI    | Gate with `supportsComponentGpuAnalyzerAsync()`, then call `runComponentGpuAnalysisAsync()`                                                                 |
-| `wasi-0.3`                                   | Isolated Component Model async proof; not a production analyzer | JSPI                | Gate with `supportsWasiAsyncProofs()`, then call `loadWasiAsyncProofsComponent()`                                                                           |
+| World / Millipede mode                       | Purpose                                                         | Requirement         | Preparation and execution                                                                                                                                                |
+| -------------------------------------------- | --------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `analysis`                                   | C0 typed non-GPU analysis boundary                              | Browser WebAssembly | Prepare `analysisComponentLoader`; `loadAnalysisComponent()` remains the compatibility view                                                                              |
+| `gpu-analysis` / `component-gpu`             | Stable P1 GPU execution                                         | WebGPU; no JSPI     | Prepare `componentGpuAnalyzerLoader`; configure `configureGpuAnalysisSummaryResolver()` and call `runComponentGpuAnalysis()`; the component finishes and submits         |
+| `gpu-analysis-frame` / `component-gpu-frame` | P1 analysis in a scheduler-owned frame                          | WebGPU; no JSPI     | Prepare `componentGpuFrameAnalyzerLoader` outside the frame, then call synchronous `encodeComponentGpuFrameAnalysis()`; the browser scheduler alone finishes and submits |
+| `gpu-analysis-async` / `component-gpu-async` | Experimental P1 async/readback path                             | WebGPU plus JSPI    | Prepare `componentGpuAnalyzerAsyncLoader`, whose unsupported result replaces ambiguous probe/load failure handling; then call `runComponentGpuAnalysisAsync()`           |
+| `wasi-0.3`                                   | Isolated Component Model async proof; not a production analyzer | JSPI                | Prepare `wasiAsyncProofsComponentLoader` only from an explicit diagnostic path; `loadWasiAsyncProofsComponent()` remains the compatibility view                          |
 
 All GPU modes accept caller-owned browser resources from one `GPUDevice`.
 Successful results keep visual, border-trace, and edge-discovery buffers and
@@ -105,16 +121,20 @@ repository's explicit-boundary-type policy.
 
 ## Source map
 
-| Source                                  | Responsibility                                                                         |
-| --------------------------------------- | -------------------------------------------------------------------------------------- |
-| `src/index.ts`                          | Public facade, capability probes, memoized component loaders, and stable/async runners |
-| `src/frame.ts`                          | Preload and synchronous recording for the borrowed shared-frame encoder                |
-| `src/generated.ts`                      | Sole adapter to JCO-generated modules and declarations                                 |
-| `src/host/gpu-types.ts`                 | Shared request, result, submission, and summary-resolver contracts                     |
-| `src/host/gpu.ts`                       | Analyzer-plan validation, output translation, and summary lifecycles                   |
-| `src/host/webgpu/`                      | Browser implementation of the imported `wasi:webgpu` resources                         |
-| `src/host/log.ts`, `src/host/events.ts` | Guest logging and event imports                                                        |
+| Source                                  | Responsibility                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------- |
+| `src/capability-state.ts`               | Pure capability states, transition triggers, and legal transition function    |
+| `src/capability.ts`                     | Async preparation controller, provider ownership, retry, and disposal effects |
+| `src/index.ts`                          | Public facade, selected capability loaders, and stable/async runners          |
+| `src/frame.ts`                          | Explicit preparation and synchronous recording for the borrowed frame encoder |
+| `src/generated.ts`                      | Private adapter from the current generated provider to callable capabilities  |
+| `src/host/gpu-types.ts`                 | Shared request, result, submission, and summary-resolver contracts            |
+| `src/host/gpu.ts`                       | Analyzer-plan validation, output translation, and summary lifecycles          |
+| `src/host/webgpu/`                      | Browser implementation of the imported `wasi:webgpu` resources                |
+| `src/host/log.ts`, `src/host/events.ts` | Guest logging and event imports                                               |
 
 For deeper contracts, see the [project README](../README.md), the
 [component-boundary test guide](../tests/component-boundary/README.md), and the
+[component capability loading contract](../docs/architecture/component-capability-loading-contract.md).
+GPU recording and submission ownership remain defined by the
 [GPU compute execution contract](../docs/architecture/gpu-compute-execution-contract.md).

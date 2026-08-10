@@ -8,10 +8,15 @@
  */
 
 import {
-  importGpuAnalysisFrameGeneratedModule,
+  instantiateGpuAnalysisFrameComponent,
   type GpuAnalysisFrameEncodedResult,
   type GpuAnalysisFrameInterface,
 } from "./generated";
+import {
+  createComponentCapabilityController,
+  createComponentCapabilityLoaderView,
+  type ComponentCapabilityLoader,
+} from "./capability";
 import {
   createComponentGpuFramePendingSummary,
   expectedEdgeDiscoverySlotCapacity,
@@ -41,13 +46,35 @@ import {
   type ExternalGpuCommandEncoding,
 } from "./host/webgpu";
 
-/** Memoized generated module import for the isolated frame world. */
-let frameModulePromise:
-  | Promise<GpuAnalysisFrameInterface | null>
-  | undefined;
+/** Shared-frame component lifecycle used by preload and synchronous encoding. */
+const componentGpuFrameAnalyzerController = createComponentCapabilityController(
+  {
+    instantiate: instantiateGpuAnalysisFrameComponent,
+    probeSupport() {
+      const wasm = globalThis.WebAssembly;
+      if (typeof wasm === "object" && wasm !== null) {
+        return { status: "supported" };
+      }
+      return {
+        status: "unsupported",
+        reason: {
+          code: "webassembly-unavailable",
+          message: "WebAssembly is unavailable in this runtime",
+        },
+      };
+    },
+    reportFailure(error) {
+      console.warn(
+        "[analysis][component-gpu-frame] component failed to load",
+        error,
+      );
+    },
+  },
+);
 
-/** Synchronously readable interface after {@link loadComponentGpuFrameAnalyzer}. */
-let frameInterface: GpuAnalysisFrameInterface | null | undefined;
+/** Explicit lifecycle for the scheduler-owned shared-frame capability. */
+export const componentGpuFrameAnalyzerLoader: ComponentCapabilityLoader<GpuAnalysisFrameInterface> =
+  createComponentCapabilityLoaderView(componentGpuFrameAnalyzerController);
 
 /**
  * Load the shared-frame component before the scheduler needs to encode.
@@ -57,22 +84,11 @@ let frameInterface: GpuAnalysisFrameInterface | null | undefined;
  * engine/device backend is created and call the synchronous encoder only
  * after it resolves.
  *
- * @returns Generated shared-frame interface, or `null` after load failure.
+ * @returns The callable shared-frame interface, or `null` when the
+ *   compatibility view does not reach the loader's ready state.
  */
 export function loadComponentGpuFrameAnalyzer(): Promise<GpuAnalysisFrameInterface | null> {
-  frameModulePromise ??= importGpuAnalysisFrameGeneratedModule()
-    .then((module) => module?.gpuAnalysisFrame ?? null)
-    .catch((error) => {
-      console.warn(
-        "[analysis][component-gpu-frame] component failed to load",
-        error,
-      );
-      return null;
-    });
-  return frameModulePromise.then((loaded) => {
-    frameInterface = loaded;
-    return loaded;
-  });
+  return componentGpuFrameAnalyzerController.prepareNullable();
 }
 
 /**
@@ -94,15 +110,19 @@ export function encodeComponentGpuFrameAnalysis(
   encoder: GPUCommandEncoder,
   summaryResolver: ComponentGpuSummaryResolver,
 ): ComponentGpuFrameEncodedOutput {
-  if (frameInterface === undefined) {
+  const frameInterface =
+    componentGpuFrameAnalyzerController.getReadyCapability();
+  const state = componentGpuFrameAnalyzerController.state;
+  if (state === "idle" || state === "preparing") {
     throw new Error(
       "[analysis][component-gpu-frame] component was not preloaded",
     );
   }
-  if (frameInterface === null) {
-    throw new Error(
-      "[analysis][component-gpu-frame] component is unavailable",
-    );
+  if (state === "disposed") {
+    throw new Error("[analysis][component-gpu-frame] component is disposed");
+  }
+  if (!frameInterface) {
+    throw new Error("[analysis][component-gpu-frame] component is unavailable");
   }
 
   const deviceHandle: GpuDevice = registerGpuDevice(input.device);
@@ -114,8 +134,10 @@ export function encodeComponentGpuFrameAnalysis(
     input.truthBuffer,
     input.device,
   );
-  const encoderHandle: WitGpuCommandEncoder =
-    registerExternalGpuCommandEncoder(encoder, input.device);
+  const encoderHandle: WitGpuCommandEncoder = registerExternalGpuCommandEncoder(
+    encoder,
+    input.device,
+  );
   let encoderProjectionConsumed = false;
   let externalEncoding: ExternalGpuCommandEncoding | null = null;
   let result: GpuAnalysisFrameEncodedResult | undefined;
@@ -182,7 +204,8 @@ export function encodeComponentGpuFrameAnalysis(
     if (!outputTransferred) {
       if (pendingSummary) {
         pendingSummary.dispose();
-      } else if (externalEncoding) {
+      }
+      if (!pendingSummary && externalEncoding) {
         // `createComponentGpuFramePendingSummary` validates before it can
         // return its lifecycle object. Cover that narrow failure window here,
         // while the staging WIT handle is still registered.
