@@ -126,6 +126,15 @@ generated boundary. Do not multiply the three component cases by every invalid
 field; they prove each adapter's distinct failure and lifecycle behavior, not
 the pure validation arithmetic again.
 
+## Shared analysis fixture
+
+`src/analysis/stats.rs::tests::fixture`,
+`tests/component-boundary/fixtures/analysis-tree.ts`, and Millipede's
+`packages/surface/inspector-wasm-host/src/self-test.ts` use the same six-node
+fixture. Its hand-computed expectations are six nodes, maximum depth three,
+two ghosts, total area 10,550, and coverage 0.425. A fixture change must update
+all three copies and their expectations together.
+
 ## Canonical ownership
 
 This directory owns the Node-side component-boundary test infrastructure. Keep

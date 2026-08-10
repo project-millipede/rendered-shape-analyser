@@ -119,6 +119,12 @@ Authored TypeScript uses extensionless relative imports. Generated imports are
 centralized in `src/generated.ts`; the loader build also enforces the
 repository's explicit-boundary-type policy.
 
+Synchronous browser metadata (`GPUTexture.width`, `GPUTexture.height`, and
+`GPUBuffer.size`) stays under `src/host/webgpu/sync/`. Promise-shaped JSPI
+operations such as queue completion and error-scope resolution stay under
+`src/host/webgpu/async/`. Do not wrap synchronous metadata in promises merely
+because one consumer is the async backend.
+
 ## Source map
 
 | Source                                  | Responsibility                                                                |
@@ -138,3 +144,6 @@ For deeper contracts, see the [project README](../README.md), the
 [component capability loading contract](../docs/architecture/component-capability-loading-contract.md).
 GPU recording and submission ownership remain defined by the
 [GPU compute execution contract](../docs/architecture/gpu-compute-execution-contract.md).
+Current generated-provider and core-Wasm mechanics are documented separately
+in the
+[JCO-generated artifact baseline](../docs/tooling/jco-generated-artifact-baseline.md).
