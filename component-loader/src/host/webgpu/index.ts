@@ -28,9 +28,7 @@ import {
   readBrowserTextureHeight,
   readBrowserTextureWidth,
 } from "./sync/metadata";
-import type {
-  ComponentGpuAnalysisCommandBuffer,
-} from "../gpu-types";
+import type { ComponentGpuAnalysisCommandBuffer } from "../gpu-types";
 
 /** Opaque upstream `wasi:webgpu` resource for a browser `GPUDevice`. */
 export class GpuDevice {
@@ -245,7 +243,9 @@ export class GpuDevice {
     descriptor: GeneratedWebGpu.GpuComputePipelineDescriptor,
   ): GpuComputePipeline {
     const { device } = requireRegisteredDevice(this);
-    const shaderRecord = requireRegisteredShaderModule(descriptor.compute.module);
+    const shaderRecord = requireRegisteredShaderModule(
+      descriptor.compute.module,
+    );
     const layoutHandle = readSpecificPipelineLayout(descriptor.layout);
     const layoutRecord = requireRegisteredPipelineLayout(layoutHandle);
     if (shaderRecord.device !== device || layoutRecord.device !== device) {
@@ -275,14 +275,10 @@ export class GpuDevice {
         `[analysis][component-gpu] unsupported analyzer entry point: ${entryPoint ?? "<missing>"}`,
       );
     }
-    const role =
-      entryPoint === "init_visuals"
-        ? "visual"
-        : entryPoint === "main"
-          ? "stats"
-          : entryPoint === "trace_borders"
-            ? "border-trace"
-            : "edge-discovery";
+    let role: AnalysisPipelineRole = "edge-discovery";
+    if (entryPoint === "init_visuals") role = "visual";
+    if (entryPoint === "main") role = "stats";
+    if (entryPoint === "trace_borders") role = "border-trace";
     if (layoutRecord.role !== role) {
       throw new Error(
         `[analysis][component-gpu] ${entryPoint} pipeline received ${layoutRecord.role} layout`,
@@ -402,11 +398,10 @@ export class GpuDevice {
       );
       return new GpuError(message ?? CLEAN_ERROR_SCOPE_MESSAGE);
     } catch (caught) {
-      throw createPopErrorScopeError(
-        caught instanceof Error
-          ? caught.message
-          : "failed to pop WebGPU error scope",
-      );
+      if (caught instanceof Error) {
+        throw createPopErrorScopeError(caught.message);
+      }
+      throw createPopErrorScopeError("failed to pop WebGPU error scope");
     }
   }
 }
@@ -442,10 +437,10 @@ export class GpuQueue {
       }
     }
 
-    const validationPhase =
-      records.length === 1
-        ? "submit component-gpu command buffer"
-        : `submit ${records.length} command buffers`;
+    let validationPhase = "submit component-gpu command buffer";
+    if (records.length !== 1) {
+      validationPhase = `submit ${records.length} command buffers`;
+    }
 
     queueRecord.device.pushErrorScope("validation");
     try {
@@ -738,9 +733,7 @@ export class GpuCommandEncoder {
     let commandBuffer: GPUCommandBuffer;
     try {
       commandBuffer = record.encoder.finish({
-        label:
-          descriptor?.label ??
-          "component-gpu command buffer",
+        label: descriptor?.label ?? "component-gpu command buffer",
       });
     } catch (caught) {
       void record.device.popErrorScope();
@@ -1098,7 +1091,11 @@ export interface ExternalGpuCommandEncoding {
 }
 
 /** Analyzer pipeline role inferred from the narrow bind-group layout. */
-type AnalysisPipelineRole = "visual" | "stats" | "border-trace" | "edge-discovery";
+type AnalysisPipelineRole =
+  | "visual"
+  | "stats"
+  | "border-trace"
+  | "edge-discovery";
 
 /** Host-owned record for an upstream `gpu-shader-module` handle. */
 export interface ShaderModuleRecord {
@@ -1193,8 +1190,10 @@ const bindGroupRecords = new WeakMap<GpuBindGroup, BindGroupRecord>();
  * @param value - Optional WIT `u64` value lowered by jco as `bigint`.
  * @returns JavaScript number accepted by browser WebGPU.
  */
-const gpuSize64ToNumber = (value: bigint | undefined): number | undefined =>
-  value === undefined ? undefined : Number(value);
+const gpuSize64ToNumber = (value: bigint | undefined): number | undefined => {
+  if (value === undefined) return undefined;
+  return Number(value);
+};
 
 /**
  * Convert upstream `gpu-buffer-usage` flags into browser `GPUBufferUsage`.
@@ -1322,15 +1321,19 @@ const gpuBindGroupLayoutEntryToBrowser = (
       "[analysis][component-gpu] sampler and storage-texture bindings are not used by the analyzer",
     );
   }
+  let buffer: GPUBufferBindingLayout | undefined;
+  if (entry.buffer) {
+    buffer = gpuBufferBindingLayoutToBrowser(entry.buffer);
+  }
+  let texture: GPUTextureBindingLayout | undefined;
+  if (entry.texture) {
+    texture = gpuTextureBindingLayoutToBrowser(entry.texture);
+  }
   return {
     binding: entry.binding,
     visibility: gpuShaderStageToBrowser(entry.visibility),
-    buffer: entry.buffer
-      ? gpuBufferBindingLayoutToBrowser(entry.buffer)
-      : undefined,
-    texture: entry.texture
-      ? gpuTextureBindingLayoutToBrowser(entry.texture)
-      : undefined,
+    buffer,
+    texture,
   };
 };
 
@@ -1698,25 +1701,33 @@ const mergeCommandResources = (
 ): void => {
   if (source.texture) {
     if (target.texture && target.texture !== source.texture) {
-      throw new Error("[analysis][component-gpu] conflicting captured textures bound");
+      throw new Error(
+        "[analysis][component-gpu] conflicting captured textures bound",
+      );
     }
     target.texture = source.texture;
   }
   if (source.truthBuffer) {
     if (target.truthBuffer && target.truthBuffer !== source.truthBuffer) {
-      throw new Error("[analysis][component-gpu] conflicting ground-truth buffers bound");
+      throw new Error(
+        "[analysis][component-gpu] conflicting ground-truth buffers bound",
+      );
     }
     target.truthBuffer = source.truthBuffer;
   }
   if (source.summaryBuffer) {
     if (target.summaryBuffer && target.summaryBuffer !== source.summaryBuffer) {
-      throw new Error("[analysis][component-gpu] conflicting summary buffers bound");
+      throw new Error(
+        "[analysis][component-gpu] conflicting summary buffers bound",
+      );
     }
     target.summaryBuffer = source.summaryBuffer;
   }
   if (source.visualBuffer) {
     if (target.visualBuffer && target.visualBuffer !== source.visualBuffer) {
-      throw new Error("[analysis][component-gpu] conflicting visual buffers bound");
+      throw new Error(
+        "[analysis][component-gpu] conflicting visual buffers bound",
+      );
     }
     target.visualBuffer = source.visualBuffer;
   }
@@ -1736,7 +1747,9 @@ const mergeCommandResources = (
       target.borderTraceBuffer &&
       target.borderTraceBuffer !== source.borderTraceBuffer
     ) {
-      throw new Error("[analysis][component-gpu] conflicting border-trace buffers bound");
+      throw new Error(
+        "[analysis][component-gpu] conflicting border-trace buffers bound",
+      );
     }
     target.borderTraceBuffer = source.borderTraceBuffer;
   }
@@ -1756,7 +1769,9 @@ const mergeCommandResources = (
       target.edgeDiscoveryBuffer &&
       target.edgeDiscoveryBuffer !== source.edgeDiscoveryBuffer
     ) {
-      throw new Error("[analysis][component-gpu] conflicting edge-discovery buffers bound");
+      throw new Error(
+        "[analysis][component-gpu] conflicting edge-discovery buffers bound",
+      );
     }
     target.edgeDiscoveryBuffer = source.edgeDiscoveryBuffer;
   }
@@ -1966,7 +1981,8 @@ const firstValidationError = async (
   first: Promise<GPUError | null> | null,
   second: Promise<GPUError | null>,
 ): Promise<GPUError | null> => {
-  const firstError = first ? await first : null;
+  if (!first) return await second;
+  const firstError = await first;
   if (firstError) return firstError;
   return await second;
 };
@@ -2189,11 +2205,14 @@ export function releaseWebGpuHandle(
   if (handle instanceof GpuBuffer) bufferRecords.delete(handle);
   if (handle instanceof GpuCommandBuffer) commandBufferRecords.delete(handle);
   if (handle instanceof GpuCommandEncoder) commandEncoderRecords.delete(handle);
-  if (handle instanceof GpuComputePassEncoder) computePassEncoderRecords.delete(handle);
+  if (handle instanceof GpuComputePassEncoder)
+    computePassEncoderRecords.delete(handle);
   if (handle instanceof GpuShaderModule) shaderModuleRecords.delete(handle);
-  if (handle instanceof GpuBindGroupLayout) bindGroupLayoutRecords.delete(handle);
+  if (handle instanceof GpuBindGroupLayout)
+    bindGroupLayoutRecords.delete(handle);
   if (handle instanceof GpuPipelineLayout) pipelineLayoutRecords.delete(handle);
-  if (handle instanceof GpuComputePipeline) computePipelineRecords.delete(handle);
+  if (handle instanceof GpuComputePipeline)
+    computePipelineRecords.delete(handle);
   if (handle instanceof GpuBindGroup) bindGroupRecords.delete(handle);
 }
 
@@ -2228,7 +2247,9 @@ export function requireRegisteredDevice(handle: GpuDevice): DeviceRecord {
 export function requireRegisteredTexture(handle: GpuTexture): TextureRecord {
   const record = textureRecords.get(handle);
   if (!record) {
-    throw new Error("[analysis][component-gpu] unregistered GPU texture handle");
+    throw new Error(
+      "[analysis][component-gpu] unregistered GPU texture handle",
+    );
   }
   return record;
 }
@@ -2409,7 +2430,9 @@ export function requireRegisteredComputePipeline(
  * @param handle - Opaque upstream bind-group resource handle.
  * @returns Browser bind-group record represented by `handle`.
  */
-export function requireRegisteredBindGroup(handle: GpuBindGroup): BindGroupRecord {
+export function requireRegisteredBindGroup(
+  handle: GpuBindGroup,
+): BindGroupRecord {
   const record = bindGroupRecords.get(handle);
   if (!record) {
     throw new Error(
@@ -2442,64 +2465,97 @@ type AssertAssignable<Actual extends Expected, Expected> = true;
 
 // These classes are runtime host resources, not a second WIT definition.
 // They must remain assignable to the generated `wasi:webgpu` resource types.
-type GpuDeviceMatchesGenerated =
-  AssertAssignable<GpuDevice, GeneratedWebGpu.GpuDevice> &
+type GpuDeviceMatchesGenerated = AssertAssignable<
+  GpuDevice,
+  GeneratedWebGpu.GpuDevice
+> &
   AssertAssignable<GpuDevice, GeneratedAsyncWebGpu.GpuDevice>;
 
-type GpuTextureMatchesGenerated =
-  AssertAssignable<GpuTexture, GeneratedWebGpu.GpuTexture> &
+type GpuTextureMatchesGenerated = AssertAssignable<
+  GpuTexture,
+  GeneratedWebGpu.GpuTexture
+> &
   AssertAssignable<GeneratedWebGpu.GpuTexture, GpuTexture> &
   AssertAssignable<GpuTexture, GeneratedAsyncWebGpu.GpuTexture> &
   AssertAssignable<GeneratedAsyncWebGpu.GpuTexture, GpuTexture>;
 
-type GpuBufferMatchesGenerated =
-  AssertAssignable<GpuBuffer, GeneratedWebGpu.GpuBuffer> &
+type GpuBufferMatchesGenerated = AssertAssignable<
+  GpuBuffer,
+  GeneratedWebGpu.GpuBuffer
+> &
   AssertAssignable<GpuBuffer, GeneratedAsyncWebGpu.GpuBuffer>;
 
-type GpuQueueMatchesGenerated =
-  AssertAssignable<GpuQueue, GeneratedWebGpu.GpuQueue> &
+type GpuQueueMatchesGenerated = AssertAssignable<
+  GpuQueue,
+  GeneratedWebGpu.GpuQueue
+> &
   AssertAssignable<GpuQueue, GeneratedAsyncWebGpu.GpuQueue>;
 
-type GpuCommandBufferMatchesGenerated =
-  AssertAssignable<GpuCommandBuffer, GeneratedWebGpu.GpuCommandBuffer> &
+type GpuCommandBufferMatchesGenerated = AssertAssignable<
+  GpuCommandBuffer,
+  GeneratedWebGpu.GpuCommandBuffer
+> &
   AssertAssignable<GpuCommandBuffer, GeneratedAsyncWebGpu.GpuCommandBuffer>;
 
-type GpuCommandEncoderMatchesGenerated =
-  AssertAssignable<GpuCommandEncoder, GeneratedWebGpu.GpuCommandEncoder> &
+type GpuCommandEncoderMatchesGenerated = AssertAssignable<
+  GpuCommandEncoder,
+  GeneratedWebGpu.GpuCommandEncoder
+> &
   AssertAssignable<GpuCommandEncoder, GeneratedAsyncWebGpu.GpuCommandEncoder> &
   AssertAssignable<GpuCommandEncoder, GeneratedFrameWebGpu.GpuCommandEncoder>;
 
-type GpuComputePassEncoderMatchesGenerated =
-  AssertAssignable<GpuComputePassEncoder, GeneratedWebGpu.GpuComputePassEncoder> &
-  AssertAssignable<GpuComputePassEncoder, GeneratedAsyncWebGpu.GpuComputePassEncoder>;
+type GpuComputePassEncoderMatchesGenerated = AssertAssignable<
+  GpuComputePassEncoder,
+  GeneratedWebGpu.GpuComputePassEncoder
+> &
+  AssertAssignable<
+    GpuComputePassEncoder,
+    GeneratedAsyncWebGpu.GpuComputePassEncoder
+  >;
 
-type GpuShaderModuleMatchesGenerated =
-  AssertAssignable<GpuShaderModule, GeneratedWebGpu.GpuShaderModule> &
+type GpuShaderModuleMatchesGenerated = AssertAssignable<
+  GpuShaderModule,
+  GeneratedWebGpu.GpuShaderModule
+> &
   AssertAssignable<GpuShaderModule, GeneratedAsyncWebGpu.GpuShaderModule>;
 
-type GpuBindGroupLayoutMatchesGenerated =
-  AssertAssignable<GpuBindGroupLayout, GeneratedWebGpu.GpuBindGroupLayout> &
+type GpuBindGroupLayoutMatchesGenerated = AssertAssignable<
+  GpuBindGroupLayout,
+  GeneratedWebGpu.GpuBindGroupLayout
+> &
   AssertAssignable<GpuBindGroupLayout, GeneratedAsyncWebGpu.GpuBindGroupLayout>;
 
-type GpuPipelineLayoutMatchesGenerated =
-  AssertAssignable<GpuPipelineLayout, GeneratedWebGpu.GpuPipelineLayout> &
+type GpuPipelineLayoutMatchesGenerated = AssertAssignable<
+  GpuPipelineLayout,
+  GeneratedWebGpu.GpuPipelineLayout
+> &
   AssertAssignable<GpuPipelineLayout, GeneratedAsyncWebGpu.GpuPipelineLayout>;
 
-type GpuComputePipelineMatchesGenerated =
-  AssertAssignable<GpuComputePipeline, GeneratedWebGpu.GpuComputePipeline> &
+type GpuComputePipelineMatchesGenerated = AssertAssignable<
+  GpuComputePipeline,
+  GeneratedWebGpu.GpuComputePipeline
+> &
   AssertAssignable<GpuComputePipeline, GeneratedAsyncWebGpu.GpuComputePipeline>;
 
-type GpuBindGroupMatchesGenerated =
-  AssertAssignable<GpuBindGroup, GeneratedWebGpu.GpuBindGroup> &
+type GpuBindGroupMatchesGenerated = AssertAssignable<
+  GpuBindGroup,
+  GeneratedWebGpu.GpuBindGroup
+> &
   AssertAssignable<GpuBindGroup, GeneratedAsyncWebGpu.GpuBindGroup>;
 
-type GpuSamplerMatchesGenerated =
-  AssertAssignable<GpuSampler, GeneratedWebGpu.GpuSampler> &
+type GpuSamplerMatchesGenerated = AssertAssignable<
+  GpuSampler,
+  GeneratedWebGpu.GpuSampler
+> &
   AssertAssignable<GpuSampler, GeneratedAsyncWebGpu.GpuSampler>;
 
-type GpuTextureViewMatchesGenerated =
-  AssertAssignable<GpuTextureView, GeneratedWebGpu.GpuTextureView> &
+type GpuTextureViewMatchesGenerated = AssertAssignable<
+  GpuTextureView,
+  GeneratedWebGpu.GpuTextureView
+> &
   AssertAssignable<GpuTextureView, GeneratedAsyncWebGpu.GpuTextureView>;
 
-type GpuErrorMatchesGenerated =
-  AssertAssignable<GpuError, GeneratedAsyncWebGpu.GpuError>;
+type GpuErrorMatchesGenerated = AssertAssignable<
+  GpuError,
+  GeneratedAsyncWebGpu.GpuError
+>;

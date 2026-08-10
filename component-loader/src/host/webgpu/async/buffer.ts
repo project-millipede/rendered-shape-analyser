@@ -127,9 +127,21 @@ export async function mapBrowserBufferForRead(
       optionalSize64ToNumber(size, "map size"),
     );
   } catch (error) {
+    if (error instanceof RangeError) {
+      throw upstreamError<UpstreamMapAsyncErrorKind>(
+        "range-error",
+        error.message,
+      );
+    }
+    if (error instanceof Error) {
+      throw upstreamError<UpstreamMapAsyncErrorKind>(
+        "abort-error",
+        error.message,
+      );
+    }
     throw upstreamError<UpstreamMapAsyncErrorKind>(
-      error instanceof RangeError ? "range-error" : "abort-error",
-      error instanceof Error ? error.message : String(error),
+      "abort-error",
+      String(error),
     );
   }
 }
@@ -159,9 +171,21 @@ export function copyMappedBrowserBufferRange(
     );
     return new Uint8Array(range).slice();
   } catch (error) {
+    if (error instanceof RangeError) {
+      throw upstreamError<UpstreamMappedRangeErrorKind>(
+        "range-error",
+        error.message,
+      );
+    }
+    if (error instanceof Error) {
+      throw upstreamError<UpstreamMappedRangeErrorKind>(
+        "operation-error",
+        error.message,
+      );
+    }
     throw upstreamError<UpstreamMappedRangeErrorKind>(
-      error instanceof RangeError ? "range-error" : "operation-error",
-      error instanceof Error ? error.message : String(error),
+      "operation-error",
+      String(error),
     );
   }
 }
@@ -176,9 +200,9 @@ export function unmapBrowserBuffer(buffer: GPUBuffer): void {
   try {
     buffer.unmap();
   } catch (error) {
-    throw upstreamError<UpstreamUnmapErrorKind>(
-      "abort-error",
-      error instanceof Error ? error.message : String(error),
-    );
+    if (error instanceof Error) {
+      throw upstreamError<UpstreamUnmapErrorKind>("abort-error", error.message);
+    }
+    throw upstreamError<UpstreamUnmapErrorKind>("abort-error", String(error));
   }
 }

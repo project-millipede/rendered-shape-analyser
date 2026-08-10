@@ -110,11 +110,9 @@ async function runNodeTool(tool: string, arguments_: readonly string[]) {
         return;
       }
 
-      rejectPromise(
-        new Error(
-          `${tool} failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}`,
-        ),
-      );
+      let failureDetail = ` with exit code ${code}`;
+      if (signal) failureDetail = ` with signal ${signal}`;
+      rejectPromise(new Error(`${tool} failed${failureDetail}`));
     });
   });
 }
