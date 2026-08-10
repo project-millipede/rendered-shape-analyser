@@ -86,6 +86,11 @@ later `analyzeTree()`, GPU `analyze()`, or frame `encode()` calls perform no
 component loading. Unsupported environments and unexpected failures are
 different typed outcomes.
 
+The current async provider requires both `WebAssembly.Suspending` and
+`WebAssembly.promising`. Capability preparation checks for them before
+importing an async component and returns `unsupported` when either is
+unavailable; application code does not need to duplicate that probe.
+
 For stable, async, and shared-frame examples—including summary and disposal
 ownership—see the [component loader guide](component-loader/README.md).
 
@@ -123,7 +128,11 @@ tracked in the
 - **Outputs transfer explicitly.** Releasing transient component handles does
   not destroy browser buffers transferred to the caller.
 - **Shared-frame ownership is strict.** The frame component appends work to a
-  borrowed encoder; it never finishes or submits it.
+  borrowed encoder; it never finishes or submits it. The current compiled
+  shared-frame artifact imports neither command-encoder `finish` nor
+  `gpu-queue` access or submission. The upstream bindings can express those
+  operations, so Rust ownership, the host guard, and component-boundary tests
+  preserve their absence.
 - **Compute support is mandatory.** A backend needs compute shaders, compute
   pipelines, and workgroup dispatch. See the
   [GPU compute execution contract](docs/architecture/gpu-compute-execution-contract.md).
