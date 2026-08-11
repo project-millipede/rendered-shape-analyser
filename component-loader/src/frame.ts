@@ -16,7 +16,7 @@ import {
   createComponentCapabilityController,
   createComponentCapabilityLoaderView,
   type ComponentCapabilityLoader,
-} from "./capability";
+} from "./legacy-capability";
 import {
   createComponentGpuFramePendingSummary,
   expectedEdgeDiscoverySlotCapacity,

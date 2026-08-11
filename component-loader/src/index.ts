@@ -15,7 +15,7 @@ import {
   createComponentCapabilityLoaderView,
   type ComponentCapabilityLoader,
   type ComponentCapabilitySupport,
-} from "./capability";
+} from "./legacy-capability";
 import {
   configureGpuAnalysisSummaryResolver,
   expectedEdgeDiscoverySlotCapacity,
@@ -82,7 +82,7 @@ export type {
   ComponentCapabilityPrepareResult,
   ComponentCapabilityState,
   ComponentUnsupportedReason,
-} from "./capability";
+} from "./legacy-capability";
 export type GuestLogLevel = "debug" | "info" | "warn" | "error";
 
 export {

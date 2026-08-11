@@ -3,7 +3,7 @@ import type * as GpuAnalysisInterfaceModule from "../../pkg/generated/gpu-analys
 import type * as GpuAnalysisAsyncInterfaceModule from "../../pkg/generated/gpu-analysis-async/interfaces/millipede-inspector-gpu-analysis-async";
 import type * as GpuAnalysisFrameInterfaceModule from "../../pkg/generated/gpu-analysis-frame/interfaces/millipede-inspector-gpu-analysis-frame";
 import type * as WasiAsyncProofsModule from "../../pkg/generated/wasi-0.3/inspector-component";
-import type { PrivatePreparedComponent } from "./capability";
+import type { PrivatePreparedComponent } from "./legacy-capability";
 
 export type AnalysisInterface = typeof AnalysisModule.analysis;
 

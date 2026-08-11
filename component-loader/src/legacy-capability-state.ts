@@ -1,22 +1,26 @@
-/** Current one-shot preparation state stored by one capability loader. */
+/** Current lifecycle state stored by one component capability loader. */
 export type ComponentCapabilityState =
   | "idle"
   | "preparing"
   | "ready"
   | "unsupported"
-  | "failed";
+  | "failed"
+  | "disposed";
 
 /** Input that asks the pure state machine to evaluate one transition. */
 export type ComponentCapabilityTransitionTrigger =
   | "prepare-requested"
+  | "retry-requested"
   | "preparation-succeeded"
   | "support-unavailable"
-  | "preparation-failed";
+  | "preparation-failed"
+  | "dispose-requested";
 
 /** Classification of how one transition trigger affects stored state. */
 export type ComponentCapabilityTransitionEffect =
   | "state-changed"
-  | "state-unchanged";
+  | "state-unchanged"
+  | "late-preparation";
 
 /** Complete pure result of applying one transition trigger. */
 export interface ComponentCapabilityStateTransition {
@@ -35,42 +39,57 @@ export interface ComponentCapabilityStateTransition {
  * event, calls a listener, or stores state.
  */
 
-/** Create one read-only transition record. */
+/** Create one immutable transition result. */
 const createTransition = (
   previousState: ComponentCapabilityState,
   nextState: ComponentCapabilityState,
   trigger: ComponentCapabilityTransitionTrigger,
   effect: ComponentCapabilityTransitionEffect,
-): ComponentCapabilityStateTransition => ({
-  previousState,
-  nextState,
-  trigger,
-  effect,
-});
+): ComponentCapabilityStateTransition =>
+  Object.freeze({ previousState, nextState, trigger, effect });
 
 /**
- * Apply one pure, one-shot capability-preparation transition.
+ * Apply one pure lifecycle transition.
  *
- * This reducer owns no promises, provider calls, prepared capabilities,
- * cleanup, or application selection. It only validates a trigger against the
- * supplied state and describes the resulting state change.
+ * This function owns no promises, provider calls, capabilities, or cleanup.
+ * Normal capability operations such as `analyze()` and `encode()` are
+ * deliberately absent: once ready, ordinary execution does not change loader
+ * state.
  *
- * Normal capability operations such as `analyze()` and `encode()` are absent:
- * after readiness, ordinary execution does not touch loader state. Unsupported
- * and failed outcomes are also settled for the lifetime of the imported
- * package entry because retrying the same ESM URL cannot reliably reset a
- * cached module-evaluation failure.
+ * A trigger is an input to this function. It is not an emitted notification.
+ * The returned transition states whether the input changed stored state.
  *
  * @param state - Current authoritative loader state.
- * @param trigger - Pure transition input to evaluate; it is not emitted.
- * @returns The complete transition record, including whether state changed.
+ * @param trigger - Transition input to evaluate.
+ * @returns The complete transition, including whether state changed.
  */
 export function transitionComponentCapabilityState(
   state: ComponentCapabilityState,
   trigger: ComponentCapabilityTransitionTrigger,
 ): ComponentCapabilityStateTransition {
+  if (state === "disposed") {
+    if (
+      trigger === "preparation-succeeded" ||
+      trigger === "support-unavailable" ||
+      trigger === "preparation-failed"
+    ) {
+      return createTransition(state, state, trigger, "late-preparation");
+    }
+    return createTransition(state, state, trigger, "state-unchanged");
+  }
+  if (trigger === "dispose-requested") {
+    return createTransition(state, "disposed", trigger, "state-changed");
+  }
+
   if (trigger === "prepare-requested") {
     if (state === "idle") {
+      return createTransition(state, "preparing", trigger, "state-changed");
+    }
+    return createTransition(state, state, trigger, "state-unchanged");
+  }
+
+  if (trigger === "retry-requested") {
+    if (state === "idle" || state === "unsupported" || state === "failed") {
       return createTransition(state, "preparing", trigger, "state-changed");
     }
     return createTransition(state, state, trigger, "state-unchanged");

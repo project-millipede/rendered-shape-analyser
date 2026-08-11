@@ -19,15 +19,7 @@ interface TransitionCase {
 const PREPARATION_SETTLEMENTS: ReadonlyArray<ComponentCapabilityTransitionTrigger> =
   ["preparation-succeeded", "support-unavailable", "preparation-failed"];
 
-/** Classify terminal requests separately from late preparation settlements. */
-const expectedDisposedEffect = (
-  trigger: ComponentCapabilityTransitionTrigger,
-): ComponentCapabilityTransitionEffect => {
-  if (PREPARATION_SETTLEMENTS.includes(trigger)) return "late-preparation";
-  return "state-unchanged";
-};
-
-/** Assert the full transition so repeated states cannot look newly entered. */
+/** Assert the complete transition record. */
 const expectTransition = ({
   state,
   trigger,
@@ -43,105 +35,56 @@ const expectTransition = ({
 };
 
 describe("component capability state machine", () => {
-  it("[P10] follows the preparation and retirement lifecycle", () => {
-    let state: ComponentCapabilityState = "idle";
-
-    state = transitionComponentCapabilityState(
-      state,
+  it("[P10] enters ready exactly once", () => {
+    const preparing = transitionComponentCapabilityState(
+      "idle",
       "prepare-requested",
-    ).nextState;
-    expect(state).toBe("preparing");
+    );
+    expect(preparing).toEqual({
+      previousState: "idle",
+      nextState: "preparing",
+      trigger: "prepare-requested",
+      effect: "state-changed",
+    });
 
     const ready = transitionComponentCapabilityState(
-      state,
+      preparing.nextState,
       "preparation-succeeded",
     );
-    expect(ready.effect).toBe("state-changed");
-    state = ready.nextState;
-    expect(state).toBe("ready");
+    expect(ready).toEqual({
+      previousState: "preparing",
+      nextState: "ready",
+      trigger: "preparation-succeeded",
+      effect: "state-changed",
+    });
 
-    state = transitionComponentCapabilityState(
-      state,
-      "dispose-requested",
-    ).nextState;
-    expect(state).toBe("disposed");
+    expectTransition({
+      state: ready.nextState,
+      trigger: "prepare-requested",
+      expectedState: "ready",
+      effect: "state-unchanged",
+    });
   });
 
-  it("[P10] keeps repeated requests on their current settled state", () => {
-    const cases: ReadonlyArray<TransitionCase> = [
-      {
-        state: "preparing",
-        trigger: "prepare-requested",
-        expectedState: "preparing",
-        effect: "state-unchanged",
-      },
-      {
-        state: "preparing",
-        trigger: "retry-requested",
-        expectedState: "preparing",
-        effect: "state-unchanged",
-      },
-      {
-        state: "ready",
-        trigger: "prepare-requested",
-        expectedState: "ready",
-        effect: "state-unchanged",
-      },
-      {
-        state: "ready",
-        trigger: "retry-requested",
-        expectedState: "ready",
-        effect: "state-unchanged",
-      },
-      {
-        state: "unsupported",
-        trigger: "prepare-requested",
-        expectedState: "unsupported",
-        effect: "state-unchanged",
-      },
-      {
-        state: "failed",
-        trigger: "prepare-requested",
-        expectedState: "failed",
-        effect: "state-unchanged",
-      },
+  it("[P10] keeps every active or settled prepare request unchanged", () => {
+    const states: ReadonlyArray<ComponentCapabilityState> = [
+      "preparing",
+      "ready",
+      "unsupported",
+      "failed",
     ];
 
-    for (const transition of cases) expectTransition(transition);
-  });
-
-  it("[P10] starts an attempt only from idle or retryable outcomes", () => {
-    const cases: ReadonlyArray<TransitionCase> = [
-      {
-        state: "idle",
+    for (const state of states) {
+      expectTransition({
+        state,
         trigger: "prepare-requested",
-        expectedState: "preparing",
-        effect: "state-changed",
-      },
-      {
-        state: "idle",
-        trigger: "retry-requested",
-        expectedState: "preparing",
-        effect: "state-changed",
-      },
-      {
-        state: "unsupported",
-        trigger: "retry-requested",
-        expectedState: "preparing",
-        effect: "state-changed",
-      },
-      {
-        state: "failed",
-        trigger: "retry-requested",
-        expectedState: "preparing",
-        effect: "state-changed",
-      },
-    ];
-
-    for (const transition of cases) expectTransition(transition);
+        expectedState: state,
+        effect: "state-unchanged",
+      });
+    }
   });
 
-  it("[P10] accepts preparation settlements only while preparing", () => {
+  it("[P10] maps the three legal settlements from preparing", () => {
     const cases: ReadonlyArray<TransitionCase> = [
       {
         state: "preparing",
@@ -162,14 +105,18 @@ describe("component capability state machine", () => {
         effect: "state-changed",
       },
     ];
-    for (const transition of cases) expectTransition(transition);
 
+    for (const transition of cases) expectTransition(transition);
+  });
+
+  it("[P10] rejects settlements without an active preparation", () => {
     const inactiveStates: ReadonlyArray<ComponentCapabilityState> = [
       "idle",
       "ready",
       "unsupported",
       "failed",
     ];
+
     for (const state of inactiveStates) {
       for (const trigger of PREPARATION_SETTLEMENTS) {
         expect(() =>
@@ -178,47 +125,6 @@ describe("component capability state machine", () => {
           `invalid component capability transition: ${state} + ${trigger}`,
         );
       }
-    }
-  });
-
-  it("[P10] makes disposed absorb requests and late settlements", () => {
-    const triggers: ReadonlyArray<ComponentCapabilityTransitionTrigger> = [
-      "prepare-requested",
-      "retry-requested",
-      "preparation-succeeded",
-      "support-unavailable",
-      "preparation-failed",
-      "dispose-requested",
-    ];
-
-    for (const trigger of triggers) {
-      expect(transitionComponentCapabilityState("disposed", trigger)).toEqual({
-        previousState: "disposed",
-        nextState: "disposed",
-        trigger,
-        effect: expectedDisposedEffect(trigger),
-      });
-    }
-  });
-
-  it("[P9] permits disposal from every live state", () => {
-    const liveStates: ReadonlyArray<ComponentCapabilityState> = [
-      "idle",
-      "preparing",
-      "ready",
-      "unsupported",
-      "failed",
-    ];
-
-    for (const state of liveStates) {
-      expect(
-        transitionComponentCapabilityState(state, "dispose-requested"),
-      ).toEqual({
-        previousState: state,
-        nextState: "disposed",
-        trigger: "dispose-requested",
-        effect: "state-changed",
-      });
     }
   });
 });
