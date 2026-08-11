@@ -198,7 +198,7 @@ export interface ComponentGpuFrameSubmission {
  */
 export interface ComponentGpuFramePendingSummary {
   /**
-   * Transfer summary buffers to the configured decoder after successful
+   * Transfer summary buffers to the call-local decoder after successful
    * scheduler submission.
    */
   resolveAfterSubmit(
@@ -271,7 +271,7 @@ export interface ComponentGpuSummaryResolveInput extends ComponentGpuAnalysisInp
 }
 
 /**
- * Summary resolver configured by the website.
+ * Summary resolver supplied by one prepared website adapter call.
  *
  * The stable component path receives a Rust-created staging-buffer descriptor
  * synchronously and the loader resolves this promise outside the component
@@ -285,27 +285,32 @@ export type ComponentGpuSummaryResolver = (
 
 type AssertAssignable<Actual extends Expected, Expected> = true;
 
-type AnalysisDispatchMatchesGenerated =
-  AssertAssignable<AnalysisDispatch, GeneratedHostGpu.AnalysisDispatch> &
+type AnalysisDispatchMatchesGenerated = AssertAssignable<
+  AnalysisDispatch,
+  GeneratedHostGpu.AnalysisDispatch
+> &
   AssertAssignable<GeneratedHostGpu.AnalysisDispatch, AnalysisDispatch>;
 
-type AnalysisKernelMatchesGenerated =
-  AssertAssignable<AnalysisKernel, GeneratedHostGpu.AnalysisKernel> &
+type AnalysisKernelMatchesGenerated = AssertAssignable<
+  AnalysisKernel,
+  GeneratedHostGpu.AnalysisKernel
+> &
   AssertAssignable<GeneratedHostGpu.AnalysisKernel, AnalysisKernel>;
 
-type AnalysisPlanMatchesGenerated =
-  AssertAssignable<AnalysisPlan, GeneratedHostGpu.AnalysisPlan> &
+type AnalysisPlanMatchesGenerated = AssertAssignable<
+  AnalysisPlan,
+  GeneratedHostGpu.AnalysisPlan
+> &
   AssertAssignable<GeneratedHostGpu.AnalysisPlan, AnalysisPlan>;
 
-type AnalysisSummaryNodeStatsMatchesGenerated =
+type AnalysisSummaryNodeStatsMatchesGenerated = AssertAssignable<
+  AnalysisSummaryNodeStats,
+  GeneratedGpuAnalysisAsync.AnalysisSummaryNodeStats
+> &
   AssertAssignable<
-    AnalysisSummaryNodeStats,
-    GeneratedGpuAnalysisAsync.AnalysisSummaryNodeStats
-  > &
-    AssertAssignable<
-      GeneratedGpuAnalysisAsync.AnalysisSummaryNodeStats,
-      AnalysisSummaryNodeStats
-    >;
+    GeneratedGpuAnalysisAsync.AnalysisSummaryNodeStats,
+    AnalysisSummaryNodeStats
+  >;
 
 // `gpu-analysis-async` omits `entry-id` from the raw JSPI return record so
 // generated jco output does not need to lift a string from a large async
@@ -313,22 +318,17 @@ type AnalysisSummaryNodeStatsMatchesGenerated =
 // request before exposing `AnalysisSummaryResult` to package consumers.
 type GeneratedAsyncSummaryPayload = Omit<AnalysisSummaryResult, "entryId">;
 
-type AnalysisSummaryResultMatchesGenerated =
+type AnalysisSummaryResultMatchesGenerated = AssertAssignable<
+  GeneratedAsyncSummaryPayload,
+  GeneratedGpuAnalysisAsync.AnalysisSummaryResult
+> &
   AssertAssignable<
-    GeneratedAsyncSummaryPayload,
-    GeneratedGpuAnalysisAsync.AnalysisSummaryResult
-  > &
-    AssertAssignable<
-      GeneratedGpuAnalysisAsync.AnalysisSummaryResult,
-      GeneratedAsyncSummaryPayload
-    >;
+    GeneratedGpuAnalysisAsync.AnalysisSummaryResult,
+    GeneratedAsyncSummaryPayload
+  >;
 
-type AnalysisFramePlanMatchesGenerated =
-  AssertAssignable<
-    AnalysisPlan,
-    GeneratedFrameHostGpu.AnalysisPlan
-  > &
-    AssertAssignable<
-      GeneratedFrameHostGpu.AnalysisPlan,
-      AnalysisPlan
-    >;
+type AnalysisFramePlanMatchesGenerated = AssertAssignable<
+  AnalysisPlan,
+  GeneratedFrameHostGpu.AnalysisPlan
+> &
+  AssertAssignable<GeneratedFrameHostGpu.AnalysisPlan, AnalysisPlan>;

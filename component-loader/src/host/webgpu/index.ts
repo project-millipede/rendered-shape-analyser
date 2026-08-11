@@ -3,8 +3,8 @@
  *
  * This module owns resource identity plus the tiny upstream surfaces the Rust
  * component currently consumes. It does not implement the full WebGPU WIT
- * interface yet; P1 implements only the upstream-shaped operations needed by
- * summary, visual, border-trace, and pixel-derived edge-discovery analyzer lanes.
+ * interface yet; it implements only the upstream-shaped operations needed by
+ * summary, visual, border-trace, and pixel-derived edge-discovery lanes.
  */
 
 import type * as GeneratedWebGpu from "../../../../pkg/generated/gpu-analysis/interfaces/wasi-webgpu-webgpu";
@@ -29,6 +29,13 @@ import {
   readBrowserTextureWidth,
 } from "./sync/metadata";
 import type { ComponentGpuAnalysisCommandBuffer } from "../gpu-types";
+import {
+  createComponentGpuOutputSet,
+  forEachComponentGpuOutput,
+  forEachComponentGpuOutputValue,
+  isCompleteComponentGpuOutputSet,
+  type ComponentGpuOutputSet,
+} from "../gpu-output-set";
 
 /** Opaque upstream `wasi:webgpu` resource for a browser `GPUDevice`. */
 export class GpuDevice {
@@ -335,17 +342,7 @@ export class GpuDevice {
       ownership: "component",
       validationPhase: label,
       setupValidation: null,
-      resources: {
-        texture: null,
-        truthBuffer: null,
-        summaryBuffer: null,
-        visualBuffer: null,
-        visualIndirectBuffer: null,
-        borderTraceBuffer: null,
-        borderTraceIndirectBuffer: null,
-        edgeDiscoveryBuffer: null,
-        edgeDiscoveryIndirectBuffer: null,
-      },
+      resources: createCommandResources(),
     });
     return handle;
   }
@@ -371,7 +368,7 @@ export class GpuDevice {
    *
    * 1. Resolves this opaque WIT handle back to its host-owned browser device.
    * 2. Delegates to the async-only WebGPU helper because error scopes are part
-   *    of the Chrome/JSPI diagnostic path.
+   *    of the JSPI async diagnostic path.
    * 3. Leaves the matching async `popErrorScope()` to finish the diagnostic.
    *
    * @param filter - Upstream WebGPU error filter requested by the component.
@@ -467,7 +464,7 @@ export class GpuQueue {
    *
    * 1. Resolves this opaque WIT handle back to its host-owned browser queue.
    * 2. Delegates to the async-only queue helper.
-   * 3. Keeps the async proof in the Chrome/JSPI component path only.
+   * 3. Keeps the async proof in the JSPI component path only.
    *
    * @returns Promise that resolves when submitted queue work is done.
    */
@@ -552,7 +549,7 @@ export class GpuBuffer {
    * Await browser `GPUBuffer.mapAsync(...)` through upstream WebGPU.
    *
    * 1. Resolves this opaque WIT handle back to its host-owned browser buffer.
-   * 2. Delegates to the Chrome/JSPI-only async helper.
+   * 2. Delegates to the JSPI async-world helper.
    * 3. Supports only read mappings for the compact diagnostic summary staging
    *    buffer; visual output remains GPU-resident and is never mapped.
    *
@@ -607,10 +604,11 @@ export class GpuBuffer {
 }
 
 /**
- * Generated stable and async worlds expose different method subsets for the
- * same upstream `gpu-buffer` resource. Runtime identity is still the same
- * class from this host module, so registry lookups accept either generated
- * shape at the boundary.
+ * Generated stable and frame worlds expose the synchronous `size` subset,
+ * while the async world also exposes mapping operations for the same upstream
+ * `gpu-buffer` resource. Runtime identity is still the same class from this
+ * host module, so host resource lookups accept every generated shape at the
+ * boundary.
  */
 export type RegisteredGpuBufferHandle =
   | GpuBuffer
@@ -926,9 +924,9 @@ export class GpuTextureView {}
  * 1. jco statically imports every resource class exposed by the selected
  *    upstream WebGPU world, even when the analyzer never creates or calls this
  *    resource.
- * 2. P1 does not implement query-set operations because the analyzer currently
- *    uses compute buffers, command encoders, passes, queues, and error scopes
- *    only.
+ * 2. This host does not implement query-set operations because the analyzer
+ *    currently uses compute buffers, command encoders, passes, queues, and
+ *    error scopes only.
  * 3. Keeping this as an empty resource class lets bundlers resolve the
  *    generated import without expanding the supported operation surface.
  */
@@ -978,22 +976,15 @@ export interface QueueRecord {
 export interface CommandResources {
   /** Captured-pixel texture bound by the statistics bind group. */
   texture: GPUTexture | null;
-  /** Component-reference buffer bound by both analyzer bind groups. */
+  /**
+   * Component-reference buffer bound by the visual, statistics, and
+   * border-trace bind groups.
+   */
   truthBuffer: GPUBuffer | null;
   /** Compact diagnostic summary buffer bound by the statistics bind group. */
   summaryBuffer: GPUBuffer | null;
-  /** GPU-resident visual-output buffer bound by the visual bind group. */
-  visualBuffer: GPUBuffer | null;
-  /** GPU-written visual indirect draw-arguments buffer. */
-  visualIndirectBuffer: GPUBuffer | null;
-  /** GPU-resident border-trace output buffer bound by the trace bind group. */
-  borderTraceBuffer: GPUBuffer | null;
-  /** GPU-written border-trace indirect draw-arguments buffer. */
-  borderTraceIndirectBuffer: GPUBuffer | null;
-  /** GPU-resident pixel-derived edge-discovery output buffer bound by the edge lane. */
-  edgeDiscoveryBuffer: GPUBuffer | null;
-  /** GPU-written edge-discovery indirect draw-arguments buffer. */
-  edgeDiscoveryIndirectBuffer: GPUBuffer | null;
+  /** Renderer-facing buffers accumulated across analyzer bind groups. */
+  outputs: ComponentGpuOutputSet<GPUBuffer | null>;
 }
 
 /**
@@ -1002,23 +993,24 @@ export interface CommandResources {
 export interface CompleteCommandResources {
   /** Captured-pixel texture bound by the statistics bind group. */
   texture: GPUTexture;
-  /** Component-reference buffer bound by both analyzer bind groups. */
+  /**
+   * Component-reference buffer bound by the visual, statistics, and
+   * border-trace bind groups.
+   */
   truthBuffer: GPUBuffer;
   /** Compact diagnostic summary buffer bound by the statistics bind group. */
   summaryBuffer: GPUBuffer;
-  /** GPU-resident visual-output buffer bound by the visual bind group. */
-  visualBuffer: GPUBuffer;
-  /** GPU-written visual indirect draw-arguments buffer. */
-  visualIndirectBuffer: GPUBuffer;
-  /** GPU-resident border-trace output buffer bound by the trace bind group. */
-  borderTraceBuffer: GPUBuffer;
-  /** GPU-written border-trace indirect draw-arguments buffer. */
-  borderTraceIndirectBuffer: GPUBuffer;
-  /** GPU-resident pixel-derived edge-discovery output buffer bound by the edge lane. */
-  edgeDiscoveryBuffer: GPUBuffer;
-  /** GPU-written edge-discovery indirect draw-arguments buffer. */
-  edgeDiscoveryIndirectBuffer: GPUBuffer;
+  /** Complete renderer-facing buffers accumulated across analyzer bind groups. */
+  outputs: ComponentGpuOutputSet<GPUBuffer>;
 }
+
+/** Create an empty resource accumulator for one analyzer command encoder. */
+const createCommandResources = (): CommandResources => ({
+  texture: null,
+  truthBuffer: null,
+  summaryBuffer: null,
+  outputs: createComponentGpuOutputSet<GPUBuffer | null>(null),
+});
 
 /**
  * Host-owned queue submission metadata before `analysis-plan` is reattached.
@@ -1478,34 +1470,25 @@ const createVisualBindGroupRecord = (
   device: GPUDevice,
   bindGroup: GPUBindGroup,
   descriptor: GeneratedWebGpu.GpuBindGroupDescriptor,
-): BindGroupRecord => ({
-  device,
-  role: "visual",
-  bindGroup,
-  resources: {
-    texture: null,
-    truthBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 1).resource,
-      1,
-    ),
-    summaryBuffer: null,
-    visualBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 3).resource,
-      3,
-    ),
-    visualIndirectBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 13).resource,
-      13,
-    ),
-    borderTraceBuffer: null,
-    borderTraceIndirectBuffer: null,
-    edgeDiscoveryBuffer: null,
-    edgeDiscoveryIndirectBuffer: null,
-  },
-});
+): BindGroupRecord => {
+  const resources = createCommandResources();
+  resources.truthBuffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 1).resource,
+    1,
+  );
+  resources.outputs.visual.buffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 3).resource,
+    3,
+  );
+  resources.outputs.visual.indirectBuffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 13).resource,
+    13,
+  );
+  return { device, role: "visual", bindGroup, resources };
+};
 
 /**
  * Build a host record for the analyzer statistics bind group.
@@ -1519,34 +1502,25 @@ const createStatsBindGroupRecord = (
   device: GPUDevice,
   bindGroup: GPUBindGroup,
   descriptor: GeneratedWebGpu.GpuBindGroupDescriptor,
-): BindGroupRecord => ({
-  device,
-  role: "stats",
-  bindGroup,
-  resources: {
-    texture: gpuTextureBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 0).resource,
-      0,
-    ),
-    truthBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 1).resource,
-      1,
-    ),
-    summaryBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 2).resource,
-      2,
-    ),
-    visualBuffer: null,
-    visualIndirectBuffer: null,
-    borderTraceBuffer: null,
-    borderTraceIndirectBuffer: null,
-    edgeDiscoveryBuffer: null,
-    edgeDiscoveryIndirectBuffer: null,
-  },
-});
+): BindGroupRecord => {
+  const resources = createCommandResources();
+  resources.texture = gpuTextureBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 0).resource,
+    0,
+  );
+  resources.truthBuffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 1).resource,
+    1,
+  );
+  resources.summaryBuffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 2).resource,
+    2,
+  );
+  return { device, role: "stats", bindGroup, resources };
+};
 
 /**
  * Build a host record for the analyzer border-trace bind group.
@@ -1560,38 +1534,31 @@ const createBorderTraceBindGroupRecord = (
   device: GPUDevice,
   bindGroup: GPUBindGroup,
   descriptor: GeneratedWebGpu.GpuBindGroupDescriptor,
-): BindGroupRecord => ({
-  device,
-  role: "border-trace",
-  bindGroup,
-  resources: {
-    texture: gpuTextureBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 0).resource,
-      0,
-    ),
-    truthBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 1).resource,
-      1,
-    ),
-    summaryBuffer: null,
-    visualBuffer: null,
-    borderTraceBuffer: gpuBufferBindingResourceToBrowser(
-      device,
-      requireBindGroupEntry(descriptor.entries, 4).resource,
-      4,
-    ),
-    borderTraceIndirectBuffer: gpuBufferBindingResourceToBrowser(
+): BindGroupRecord => {
+  const resources = createCommandResources();
+  resources.texture = gpuTextureBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 0).resource,
+    0,
+  );
+  resources.truthBuffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 1).resource,
+    1,
+  );
+  resources.outputs.borderTrace.buffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 4).resource,
+    4,
+  );
+  resources.outputs.borderTrace.indirectBuffer =
+    gpuBufferBindingResourceToBrowser(
       device,
       requireBindGroupEntry(descriptor.entries, 14).resource,
       14,
-    ),
-    edgeDiscoveryBuffer: null,
-    visualIndirectBuffer: null,
-    edgeDiscoveryIndirectBuffer: null,
-  },
-});
+    );
+  return { device, role: "border-trace", bindGroup, resources };
+};
 
 /**
  * Build a host record for the analyzer edge-discovery bind group.
@@ -1651,34 +1618,24 @@ const createEdgeDiscoveryBindGroupRecord = (
     11,
   );
 
-  return {
+  const resources = createCommandResources();
+  resources.texture = gpuTextureBindingResourceToBrowser(
     device,
-    role: "edge-discovery",
-    bindGroup,
-    resources: {
-      texture: gpuTextureBindingResourceToBrowser(
-        device,
-        requireBindGroupEntry(descriptor.entries, 0).resource,
-        0,
-      ),
-      truthBuffer: null,
-      summaryBuffer: null,
-      visualBuffer: null,
-      visualIndirectBuffer: null,
-      borderTraceBuffer: null,
-      borderTraceIndirectBuffer: null,
-      edgeDiscoveryBuffer: gpuBufferBindingResourceToBrowser(
-        device,
-        requireBindGroupEntry(descriptor.entries, 10).resource,
-        10,
-      ),
-      edgeDiscoveryIndirectBuffer: gpuBufferBindingResourceToBrowser(
-        device,
-        requireBindGroupEntry(descriptor.entries, 13).resource,
-        13,
-      ),
-    },
-  };
+    requireBindGroupEntry(descriptor.entries, 0).resource,
+    0,
+  );
+  resources.outputs.edgeDiscovery.buffer = gpuBufferBindingResourceToBrowser(
+    device,
+    requireBindGroupEntry(descriptor.entries, 10).resource,
+    10,
+  );
+  resources.outputs.edgeDiscovery.indirectBuffer =
+    gpuBufferBindingResourceToBrowser(
+      device,
+      requireBindGroupEntry(descriptor.entries, 13).resource,
+      13,
+    );
+  return { device, role: "edge-discovery", bindGroup, resources };
 };
 
 /**
@@ -1695,6 +1652,20 @@ const createEdgeDiscoveryBindGroupRecord = (
  * @param source - Bind-group resources to merge.
  * @returns Nothing.
  */
+const mergeCommandBufferResource = (
+  current: GPUBuffer | null,
+  incoming: GPUBuffer | null,
+  description: string,
+): GPUBuffer | null => {
+  if (!incoming) return current;
+  if (current && current !== incoming) {
+    throw new Error(
+      `[analysis][component-gpu] conflicting ${description} buffers bound`,
+    );
+  }
+  return incoming;
+};
+
 const mergeCommandResources = (
   target: CommandResources,
   source: CommandResources,
@@ -1707,85 +1678,29 @@ const mergeCommandResources = (
     }
     target.texture = source.texture;
   }
-  if (source.truthBuffer) {
-    if (target.truthBuffer && target.truthBuffer !== source.truthBuffer) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting ground-truth buffers bound",
-      );
-    }
-    target.truthBuffer = source.truthBuffer;
-  }
-  if (source.summaryBuffer) {
-    if (target.summaryBuffer && target.summaryBuffer !== source.summaryBuffer) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting summary buffers bound",
-      );
-    }
-    target.summaryBuffer = source.summaryBuffer;
-  }
-  if (source.visualBuffer) {
-    if (target.visualBuffer && target.visualBuffer !== source.visualBuffer) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting visual buffers bound",
-      );
-    }
-    target.visualBuffer = source.visualBuffer;
-  }
-  if (source.visualIndirectBuffer) {
-    if (
-      target.visualIndirectBuffer &&
-      target.visualIndirectBuffer !== source.visualIndirectBuffer
-    ) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting visual indirect buffers bound",
-      );
-    }
-    target.visualIndirectBuffer = source.visualIndirectBuffer;
-  }
-  if (source.borderTraceBuffer) {
-    if (
-      target.borderTraceBuffer &&
-      target.borderTraceBuffer !== source.borderTraceBuffer
-    ) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting border-trace buffers bound",
-      );
-    }
-    target.borderTraceBuffer = source.borderTraceBuffer;
-  }
-  if (source.borderTraceIndirectBuffer) {
-    if (
-      target.borderTraceIndirectBuffer &&
-      target.borderTraceIndirectBuffer !== source.borderTraceIndirectBuffer
-    ) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting border-trace indirect buffers bound",
-      );
-    }
-    target.borderTraceIndirectBuffer = source.borderTraceIndirectBuffer;
-  }
-  if (source.edgeDiscoveryBuffer) {
-    if (
-      target.edgeDiscoveryBuffer &&
-      target.edgeDiscoveryBuffer !== source.edgeDiscoveryBuffer
-    ) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting edge-discovery buffers bound",
-      );
-    }
-    target.edgeDiscoveryBuffer = source.edgeDiscoveryBuffer;
-  }
-  if (source.edgeDiscoveryIndirectBuffer) {
-    if (
-      target.edgeDiscoveryIndirectBuffer &&
-      target.edgeDiscoveryIndirectBuffer !== source.edgeDiscoveryIndirectBuffer
-    ) {
-      throw new Error(
-        "[analysis][component-gpu] conflicting edge-discovery indirect buffers bound",
-      );
-    }
-    target.edgeDiscoveryIndirectBuffer = source.edgeDiscoveryIndirectBuffer;
-  }
+  target.truthBuffer = mergeCommandBufferResource(
+    target.truthBuffer,
+    source.truthBuffer,
+    "ground-truth",
+  );
+  target.summaryBuffer = mergeCommandBufferResource(
+    target.summaryBuffer,
+    source.summaryBuffer,
+    "summary",
+  );
+  forEachComponentGpuOutput(source.outputs, (sourceOutput, outputName) => {
+    const targetOutput = target.outputs[outputName];
+    targetOutput.buffer = mergeCommandBufferResource(
+      targetOutput.buffer,
+      sourceOutput.buffer,
+      `${outputName} output`,
+    );
+    targetOutput.indirectBuffer = mergeCommandBufferResource(
+      targetOutput.indirectBuffer,
+      sourceOutput.indirectBuffer,
+      `${outputName} indirect`,
+    );
+  });
 };
 
 /**
@@ -1797,41 +1712,16 @@ const mergeCommandResources = (
 const requireCompleteCommandResources = (
   resources: CommandResources,
 ): CompleteCommandResources | null => {
-  const {
-    texture,
-    truthBuffer,
-    summaryBuffer,
-    visualBuffer,
-    visualIndirectBuffer,
-    borderTraceBuffer,
-    borderTraceIndirectBuffer,
-    edgeDiscoveryBuffer,
-    edgeDiscoveryIndirectBuffer,
-  } = resources;
+  const { texture, truthBuffer, summaryBuffer, outputs } = resources;
   if (
     !texture ||
     !truthBuffer ||
     !summaryBuffer ||
-    !visualBuffer ||
-    !visualIndirectBuffer ||
-    !borderTraceBuffer ||
-    !borderTraceIndirectBuffer ||
-    !edgeDiscoveryBuffer ||
-    !edgeDiscoveryIndirectBuffer
+    !isCompleteComponentGpuOutputSet(outputs)
   ) {
     return null;
   }
-  return {
-    texture,
-    truthBuffer,
-    summaryBuffer,
-    visualBuffer,
-    visualIndirectBuffer,
-    borderTraceBuffer,
-    borderTraceIndirectBuffer,
-    edgeDiscoveryBuffer,
-    edgeDiscoveryIndirectBuffer,
-  };
+  return { texture, truthBuffer, summaryBuffer, outputs };
 };
 
 /**
@@ -2067,17 +1957,7 @@ export function registerExternalGpuCommandEncoder(
     ownership: "scheduler-borrowed",
     validationPhase: "encode component-gpu-frame commands",
     setupValidation: null,
-    resources: {
-      texture: null,
-      truthBuffer: null,
-      summaryBuffer: null,
-      visualBuffer: null,
-      visualIndirectBuffer: null,
-      borderTraceBuffer: null,
-      borderTraceIndirectBuffer: null,
-      edgeDiscoveryBuffer: null,
-      edgeDiscoveryIndirectBuffer: null,
-    },
+    resources: createCommandResources(),
   });
   return handle;
 }
@@ -2114,6 +1994,52 @@ export function takeExternalGpuCommandEncoding(
     setupValidation: record.setupValidation,
     validationPhase: record.validationPhase,
   };
+}
+
+/**
+ * Discard one failed borrowed-encoder projection without touching the encoder.
+ *
+ * This abort path removes only the temporary WIT projection and destroys every
+ * component-owned output already recorded on it. Caller-owned textures,
+ * reference buffers, and the native scheduler encoder are not destroyed. It
+ * does not roll back commands already appended to that encoder and does not
+ * make the encoder reusable. After any component frame-encoding failure, the
+ * scheduler must abandon the whole encoder/frame without finishing or
+ * submitting it. The frame adapter uses the returned native-buffer identities
+ * only to avoid destroying a returned output twice during local cleanup.
+ *
+ * @param handle - Borrowed command-encoder projection whose extraction failed.
+ * @returns Native component-owned buffers destroyed during the discard.
+ */
+export function discardExternalGpuCommandEncodingProjection(
+  handle: GpuCommandEncoder,
+): ReadonlySet<GPUBuffer> {
+  const destroyedBuffers = new Set<GPUBuffer>();
+  const record = commandEncoderRecords.get(handle);
+  if (!record) return destroyedBuffers;
+  if (record.ownership !== "scheduler-borrowed") {
+    throw new Error(
+      "[analysis][component-gpu-frame] component-owned encoder cannot be discarded as scheduler borrow",
+    );
+  }
+
+  commandEncoderRecords.delete(handle);
+  const destroyComponentOwnedBuffer = (buffer: GPUBuffer | null): void => {
+    if (!buffer) return;
+    if (destroyedBuffers.has(buffer)) return;
+    try {
+      buffer.destroy();
+      destroyedBuffers.add(buffer);
+    } catch {
+      // Cleanup must preserve the component failure that led here.
+    }
+  };
+  destroyComponentOwnedBuffer(record.resources.summaryBuffer);
+  forEachComponentGpuOutputValue(
+    record.resources.outputs,
+    destroyComponentOwnedBuffer,
+  );
+  return destroyedBuffers;
 }
 
 /**
