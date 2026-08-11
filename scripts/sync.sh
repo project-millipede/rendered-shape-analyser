@@ -56,13 +56,14 @@ npx jco transpile "$ANALYSIS_COMPONENT" \
   --base64-cutoff 0 \
   --no-namespaced-exports
 
+# `millipede:inspector/host-gpu` currently contributes records and resource
+# types only, so JCO emits declarations for it but no runtime host import.
 npx jco transpile "$GPU_ANALYSIS_COMPONENT" \
   -o "$GPU_ANALYSIS_STAGING_DIR" \
   --name inspector-component \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
-  --map 'millipede:inspector/host-gpu@0.1.0=../../../component-loader/dist/host/gpu.js' \
   --base64-cutoff 0 \
   --no-namespaced-exports
 
@@ -72,7 +73,6 @@ npx jco transpile "$GPU_ANALYSIS_ASYNC_COMPONENT" \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
-  --map 'millipede:inspector/host-gpu@0.1.0=../../../component-loader/dist/host/gpu.js' \
   --async-mode jspi \
   --async-exports 'millipede:inspector/gpu-analysis-async@0.1.0#analyze' \
   --base64-cutoff 0 \
@@ -84,7 +84,6 @@ npx jco transpile "$GPU_ANALYSIS_FRAME_COMPONENT" \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
-  --map 'millipede:inspector/host-gpu@0.1.0=../../../component-loader/dist/host/gpu.js' \
   --base64-cutoff 0 \
   --no-namespaced-exports
 

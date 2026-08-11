@@ -1,27 +1,7 @@
 import { defineConfig, type Options } from "tsup";
 
-const generatedRuntimeModules = new Map([
-  [
-    "../../pkg/generated/analysis/inspector-component",
-    "../../pkg/generated/analysis/inspector-component.js",
-  ],
-  [
-    "../../pkg/generated/gpu-analysis/inspector-component",
-    "../../pkg/generated/gpu-analysis/inspector-component.js",
-  ],
-  [
-    "../../pkg/generated/gpu-analysis-async/inspector-component",
-    "../../pkg/generated/gpu-analysis-async/inspector-component.js",
-  ],
-  [
-    "../../pkg/generated/gpu-analysis-frame/inspector-component",
-    "../../pkg/generated/gpu-analysis-frame/inspector-component.js",
-  ],
-  [
-    "../../pkg/generated/wasi-0.3/inspector-component",
-    "../../pkg/generated/wasi-0.3/inspector-component.js",
-  ],
-]);
+const generatedRuntimePrefix = "../../../pkg/generated/";
+const generatedRuntimeSuffix = "/inspector-component";
 
 /**
  * Create the build-time bridge from authored extensionless generated imports
@@ -53,14 +33,17 @@ function createGeneratedRuntimeModulePluginOptions(): Pick<
           build.onResolve(
             {
               filter:
-                /^\.\.\/\.\.\/pkg\/generated\/(?:analysis|gpu-analysis|gpu-analysis-async|gpu-analysis-frame|wasi-0\.3)\/inspector-component$/,
+                /^\.\.\/\.\.\/\.\.\/pkg\/generated\/[^/]+\/inspector-component$/,
             },
             (args) => {
-              const runtimePath = generatedRuntimeModules.get(args.path);
-              if (!runtimePath) return;
+              const world = args.path.slice(
+                generatedRuntimePrefix.length,
+                -generatedRuntimeSuffix.length,
+              );
+              if (!world) return;
               return {
                 external: true,
-                path: runtimePath,
+                path: `../../pkg/generated/${world}/inspector-component.js`,
               };
             },
           );
@@ -77,11 +60,12 @@ export default defineConfig({
   dts: true,
   entry: {
     index: "component-loader/src/index.ts",
-    frame: "component-loader/src/frame.ts",
+    analysis: "component-loader/src/analysis.ts",
+    "gpu-analysis": "component-loader/src/gpu-analysis.ts",
+    "gpu-analysis-async": "component-loader/src/gpu-analysis-async.ts",
+    "gpu-analysis-frame": "component-loader/src/gpu-analysis-frame.ts",
+    diagnostics: "component-loader/src/diagnostics.ts",
     "host/events": "component-loader/src/host/events.ts",
-    generated: "component-loader/src/generated.ts",
-    "host/gpu": "component-loader/src/host/gpu.ts",
-    "host/gpu-types": "component-loader/src/host/gpu-types.ts",
     "host/log": "component-loader/src/host/log.ts",
     "host/webgpu": "component-loader/src/host/webgpu/index.ts",
   },
@@ -90,5 +74,5 @@ export default defineConfig({
   platform: "browser",
   splitting: true,
   target: "es2022",
-  treeshake: false,
+  treeshake: true,
 });

@@ -13,6 +13,26 @@
     ".": {
       "types": "./component-loader/dist/index.d.ts",
       "default": "./component-loader/dist/index.js"
+    },
+    "./analysis": {
+      "types": "./component-loader/dist/analysis.d.ts",
+      "default": "./component-loader/dist/analysis.js"
+    },
+    "./gpu-analysis": {
+      "types": "./component-loader/dist/gpu-analysis.d.ts",
+      "default": "./component-loader/dist/gpu-analysis.js"
+    },
+    "./gpu-analysis-async": {
+      "types": "./component-loader/dist/gpu-analysis-async.d.ts",
+      "default": "./component-loader/dist/gpu-analysis-async.js"
+    },
+    "./gpu-analysis-frame": {
+      "types": "./component-loader/dist/gpu-analysis-frame.d.ts",
+      "default": "./component-loader/dist/gpu-analysis-frame.js"
+    },
+    "./diagnostics": {
+      "types": "./component-loader/dist/diagnostics.d.ts",
+      "default": "./component-loader/dist/diagnostics.js"
     }
   },
   "files": [
