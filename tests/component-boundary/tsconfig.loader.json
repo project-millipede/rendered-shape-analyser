@@ -4,9 +4,6 @@
     "module": "ESNext",
     "moduleResolution": "Bundler"
   },
-  "include": [
-    "unit/component-capability-loader.test.ts",
-    "unit/component-capability-state.test.ts"
-  ],
+  "include": ["unit/component-*.test.ts"],
   "exclude": []
 }

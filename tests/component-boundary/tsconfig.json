@@ -23,9 +23,5 @@
     "unit/**/*.ts",
     "vitest.config.ts"
   ],
-  "exclude": [
-    "../../target/component-tests",
-    "unit/component-capability-loader.test.ts",
-    "unit/component-capability-state.test.ts"
-  ]
+  "exclude": ["../../target/component-tests", "unit/component-*.test.ts"]
 }
