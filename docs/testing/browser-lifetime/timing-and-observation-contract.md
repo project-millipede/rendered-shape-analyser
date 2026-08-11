@@ -142,9 +142,13 @@ adapter before requesting the device:
 
 ```ts
 const supportsTimestampQuery = adapter.features.has("timestamp-query");
+const requiredFeatures: Array<GPUFeatureName> = [];
+if (supportsTimestampQuery) {
+  requiredFeatures.push("timestamp-query");
+}
 
 const device = await adapter.requestDevice({
-  requiredFeatures: supportsTimestampQuery ? ["timestamp-query"] : [],
+  requiredFeatures,
 });
 ```
 
@@ -456,8 +460,8 @@ component-provider preparation has no event in this vocabulary.
 | `gpu_runtime_prepare_begin` | Content                | After callable-component readiness and immediately before the explicitly declared device/session/entry/resource preparation phase |
 | `gpu_runtime_prepare_end`   | Content                | The declared post-ready preparation phase is complete; its exact lifecycle scope is attached to the event                         |
 | `input_ready`               | Content                | Browser-owned device, texture, reference buffer, and request metadata are ready                                                   |
-| `component_call_begin`      | Content                | Immediately before entering the public loader operation for the measured invocation                                               |
-| `component_call_end`        | Content                | The selected public loader operation returns synchronously or its promise settles successfully                                    |
+| `component_call_begin`      | Content                | Immediately before entering the public ready-capability operation for the measured invocation                                     |
+| `component_call_end`        | Content                | The selected public ready-capability operation returns synchronously or its promise settles successfully                          |
 | `commands_recorded`         | Content                | Variant-specific boundary at which analyser commands have been appended and no more analyser recording occurs                     |
 | `submit_call_begin`         | Content                | Immediately before the owning queue submission                                                                                    |
 | `submit_call_end`           | Content                | Immediately after synchronous `queue.submit()` returns successfully                                                               |
@@ -565,8 +569,8 @@ differ.
 
 ### Stable entry
 
-The current public stable loader operation is promise-shaped at the authored
-loader boundary even though the generated Rust export is synchronous. Rust
+The current public stable ready-capability operation is promise-shaped even
+though the generated Rust export is synchronous. Rust
 creates its encoder, records the compute pass and copies, finishes, submits,
 and returns a summary readback descriptor. The authored loader then resolves
 the summary before returning the complete public result.
@@ -587,7 +591,7 @@ input_ready
     → outputs published
 ```
 
-`component_call_ms` includes loader summary resolution, while
+`component_call_ms` includes authored call-local summary resolution, while
 `input_to_output_publish_ms` can expose summary gating. Query resolution must
 be encoded before the component-owned encoder is finished; the public return
 is too late. An outputs-first candidate would move the publication event but
@@ -597,8 +601,8 @@ must retain the same work and explicit summary timing.
 
 The async component export owns encoding, finishing, submission, queue
 completion, mapping, and summary decoding across the JSPI boundary. The public
-loader settles after the async generated export returns its summary and output
-handles.
+ready-capability Promise settles after the generated export returns its summary
+and output handles.
 
 ```text
 input_ready

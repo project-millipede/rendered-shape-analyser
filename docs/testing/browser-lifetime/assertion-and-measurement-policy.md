@@ -1,7 +1,7 @@
 # Browser-lifetime assertion and measurement policy
 
 > - **Status:** Required policy for the planned harness
-> - **Last reviewed:** 2026-08-10
+> - **Last reviewed:** 2026-08-11
 > - **Primary risk addressed:** Brittle tests and false lifetime conclusions
 > - **Applies before:** Any browser observation is promoted to a CI failure
 > - **Parent:** [Real-browser WebGPU lifetime testing](README.md)
@@ -331,8 +331,8 @@ fabricate a zero.
 WebGPU validation and execution may fail asynchronously. A scenario must use
 the strongest completion boundary available for its variant:
 
-- stable: configured summary resolver, validation promises, queue completion,
-  and staging mapping;
+- stable: invocation-local summary resolver passed through `analyze()` options,
+  validation promises, queue completion, and staging mapping;
 - async: awaited guest call, queue completion, mapping, copy, and unmap;
 - shared-frame: scheduler finish/submit followed by pending-summary resolution.
 
@@ -483,7 +483,7 @@ Every scenario records the strongest boundary it actually reached:
 | Device lost               | The device became unusable or was intentionally destroyed |
 
 The stable scenario does not pass when the synchronous guest export merely
-returns; it must reach the configured resolver's completion and mapping
+returns; it must reach the invocation-local resolver's completion and mapping
 boundary. The async scenario must await its JSPI call and summary readback. The
 shared-frame scenario treats component return as recording completion only and
 passes the submitted branch only after the harness finishes, submits, and

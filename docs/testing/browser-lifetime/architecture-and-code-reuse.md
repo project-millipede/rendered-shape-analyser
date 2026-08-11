@@ -1,7 +1,7 @@
 # Browser-lifetime architecture and code reuse
 
 > - **Status:** Planned architecture
-> - **Last reviewed:** 2026-08-10
+> - **Last reviewed:** 2026-08-11
 > - **Depends on:** Existing authored loader and generated component worlds
 > - **Does not authorize:** A public lifetime resource, new backend, or copied
 >   WebGPU host
@@ -32,13 +32,13 @@ The architecture exists to prevent two opposite failures:
 | Decision                                             | Consequence                                                                                                                       |
 | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | The harness lives in this repository                 | H1 implementation and evidence can be reviewed with the component and browser host without changing Millipede production packages |
-| The page imports the built root-package API          | It exercises the same facade, generated bindings, import mappings, and host modules that consumers receive                        |
+| The page imports one built runtime subpath           | It exercises the selected authored capability, provider, import mappings, and host modules that consumers receive                 |
 | Raw WebGPU inputs are browser-owned                  | The harness controls input lifetime without copying Millipede capture, state, or rendering systems                                |
 | Internal workload resources remain component-created | The harness does not reproduce Rust buffer, shader, pipeline, bind-group, or command construction                                 |
 | One minimal fixture is shared by all GPU variants    | Stable, async, and frame results cannot diverge because their texture or reference input differs                                  |
 | Each variant keeps an explicit lifecycle sequence    | Encoder, submission, summary, and abort ownership remain reviewable                                                               |
 | A callable capability gates every measured run       | Component-provider preparation remains an opaque, untimed prerequisite                                                            |
-| The current provider remains private                 | JCO is exercised by today's build but cannot define harness metrics, events, or permanent abstractions                            |
+| The current provider remains private                 | Its implementation cannot define harness metrics, events, or permanent abstractions                                               |
 | Structural counts begin as observations              | The current mixed workload does not become the permanent lifetime contract                                                        |
 | Millipede is a later black-box acceptance target     | The isolated proof remains attributable and reproducible                                                                          |
 | Native `wgpu` is a separate future evidence path     | Browser Component Model evidence is not confused with native backend portability                                                  |
@@ -49,7 +49,7 @@ The architecture exists to prevent two opposite failures:
 flowchart TD
   R["Chromium test runner"] --> P["Minimal browser page"]
   P --> L["Authored component-loader public API"]
-  L --> G["Private component provider<br/>(currently JCO-generated)"]
+  L --> G["Private selected-world provider"]
   G --> A["Callable selected capability"]
   P -. "wire only" .-> O["Dormant observation seam"]
   A -- "ready: arm capture" --> O
@@ -64,10 +64,9 @@ flowchart TD
 
 Every solid execution edge in this graph uses the real selected runtime path.
 The harness must not replace `component-loader`, the selected component, or the
-authored WebGPU host with a test double in the real-browser profile. The current
-JCO-generated provider remains part of the exercised compatibility baseline,
-but its internal topology and preparation work are provenance rather than
-measurement authority.
+authored WebGPU host with a test double in the real-browser profile. The
+selected private provider remains part of the exercised build, but its internal
+topology and preparation work are provenance rather than measurement authority.
 
 Observer code may be wired before component preparation so it can later see the
 real objects. It must remain dormant until the selected component is callable:
@@ -80,61 +79,67 @@ The package exports several independent component worlds. They are not one
 generic “component call,” and their prerequisites must not bleed into each
 other.
 
-| World                | Public entrypoint                                                          | WebGPU | JSPI | Browser-lifetime role                         |
-| -------------------- | -------------------------------------------------------------------------- | -----: | ---: | --------------------------------------------- |
-| `analysis`           | `loadAnalysisComponent()`                                                  |     No |   No | Optional separate non-GPU boundary diagnostic |
-| `gpu-analysis`       | `runComponentGpuAnalysis()`                                                |    Yes |   No | Initial stable lifetime path                  |
-| `gpu-analysis-frame` | `loadComponentGpuFrameAnalyzer()` and `encodeComponentGpuFrameAnalysis()`  |    Yes |   No | Scheduler-owned encoder path                  |
-| `gpu-analysis-async` | `supportsComponentGpuAnalyzerAsync()` and `runComponentGpuAnalysisAsync()` |    Yes |  Yes | Conditional asynchronous path                 |
-| `wasi-0.3`           | `loadWasiAsyncProofsComponent()`                                           |     No |  Yes | Outside GPU-lifetime scope                    |
+| World                | Package subpath       | Loader                            | Ready-capability operation                               | WebGPU | JSPI | Browser-lifetime role                         |
+| -------------------- | --------------------- | --------------------------------- | -------------------------------------------------------- | -----: | ---: | --------------------------------------------- |
+| `analysis`           | `/analysis`           | `analysisComponentLoader`         | `analyzeTree(...)`                                       |     No |   No | Optional separate non-GPU boundary diagnostic |
+| `gpu-analysis`       | `/gpu-analysis`       | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |    Yes |   No | Initial stable lifetime path                  |
+| `gpu-analysis-frame` | `/gpu-analysis-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |    Yes |   No | Scheduler-owned encoder path                  |
+| `gpu-analysis-async` | `/gpu-analysis-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |    Yes |  Yes | Conditional asynchronous path                 |
+| `wasi-0.3`           | `/diagnostics`        | `wasiAsyncProofsComponentLoader`  | Explicit proof operation                                 |     No |  Yes | Outside GPU-lifetime scope                    |
 
 The separate non-GPU analysis diagnostic must not request an adapter or
 construct the GPU fixture. It loads a different component artifact and should
 normally be skipped by the GPU-lifetime path. Its success is not evidence that
 the selected GPU component is ready or that any WebGPU resource-lifetime
 property holds. The isolated WASI async proof can confirm a JSPI projection
-but cannot establish GPU ownership or destruction.
+but cannot establish GPU ownership or destruction. The `/diagnostics` split
+isolates those WASI proofs; it does not separate GPU-to-CPU summary readback
+from the stable, async, or frame analyzer capabilities. Millipede reaches this
+proof only through the explicit
+`@millipede/surface-inspector-browser/diagnostics` entry; ordinary backend
+selection does not import it.
 
 ## Package and module identity
 
-The page must consume the built package facade, for example:
+The page must consume the built selected runtime subpath. The initial stable
+scenario imports only:
 
 ```ts
-import {
-  configureGpuAnalysisSummaryResolver,
-  encodeComponentGpuFrameAnalysis,
-  loadComponentGpuAnalyzer,
-  loadComponentGpuAnalyzerAsync,
-  loadComponentGpuFrameAnalyzer,
-  runComponentGpuAnalysis,
-  runComponentGpuAnalysisAsync,
-  supportsComponentGpuAnalyzerAsync,
-} from "@millipede/inspector-component";
+import { componentGpuAnalyzerLoader } from "@millipede/inspector-component/gpu-analysis";
 ```
 
-It must not import `component-loader/src/index.ts` directly. In the current
-compatibility provider, generated JCO modules are mapped to built modules under
-`component-loader/dist/host/`. Mixing an authored source import with a generated
-module that imports the built host can instantiate two independent JavaScript
-module graphs and two independent resource registries. A handle registered in
-one graph would then be invisible to the generated component in the other,
+Async and frame scenarios import their corresponding subpaths in isolated page
+or bundle entries. The package root is type-only and is not a runtime facade.
+The harness must not import `component-loader/src/*.ts` directly. Mixing an
+authored source import with a private provider that imports the built host can
+instantiate two independent JavaScript module graphs and resource registries.
+A handle registered in one graph would then be invisible in the other,
 producing a harness-created false failure.
 
 The implementation therefore must:
 
 1. build and serve the package payload used by consumers;
-2. import the public facade rather than generated modules directly;
+2. import one public variant subpath rather than private provider modules;
 3. resolve each built host module through one canonical browser URL;
 4. avoid bundling a private second copy of the host;
-5. keep generated-module access centralized in
-   [`component-loader/src/generated.ts`](../../../component-loader/src/generated.ts);
+5. keep each generated-world import inside its matching adapter under
+   [`component-loader/src/providers/`](../../../component-loader/src/providers/);
 6. use a fresh page or browser context when a scenario requires fresh memoized
    component state, instead of adding a production reset API.
 
-Loader memoization per page is real package behavior and remains visible to
-the harness. A scenario that needs a new device generation may create one in
-the same page when that is the subject under test; a scenario that needs a new
-module/registry instance reloads the page explicitly.
+Loader single-flight state per selected module is real package behavior and
+remains visible to the harness. The module-wide loader is one-shot and exposes
+only `state` and `prepare()`. Every call receives the same active or settled
+Promise; `unsupported` and `failed` remain settled for that module. A scenario
+that needs a new loader attempt reloads the page or uses an intentionally new,
+versioned module URL.
+
+A scenario that needs a new GPU-device generation may create and retire that
+generation in the same page without resetting the component loader. Millipede
+and the harness still dispose device-local sessions, pending summaries,
+transferred outputs, and browser-owned resources through their real ownership
+contracts. Those resource lifetimes are independent of the non-disposable
+component-loader module.
 
 These module-layout facts describe the current provider baseline. The durable
 rule is that the page reaches one selected callable capability and one browser
@@ -142,24 +147,30 @@ host/registry identity through the public package. The harness does not measure
 or assert the provider's internal modules, requests, compilation, or cache
 topology.
 
+Future C1/V1 acceptance proves selected loading against the final deployed
+consumer by recording Chromium's actual requests: the selected variant must be
+requested, unselected and diagnostic worlds must remain absent, and execution
+after `ready` must trigger no further component loading. This browser evidence
+is authoritative for the deployed selection boundary. That C1/V1 evidence and
+the H1 harness remain pending.
+
 ## Prepared-capability gate
 
 Each variant is prepared through its authored public loader before a measured
 scenario creates its GPU fixture:
 
-| Variant      | Current preparation call                                 | Ready means                                                       |
-| ------------ | -------------------------------------------------------- | ----------------------------------------------------------------- |
-| Stable       | `loadComponentGpuAnalyzer()`                             | The stable component export is callable                           |
-| Async        | capability probe, then `loadComponentGpuAnalyzerAsync()` | JSPI is supported and the async component export is callable      |
-| Shared frame | `loadComponentGpuFrameAnalyzer()`                        | The synchronous frame export is callable before an encoder exists |
+| Variant      | Preparation call                            | Ready means                                                          |
+| ------------ | ------------------------------------------- | -------------------------------------------------------------------- |
+| Stable       | `componentGpuAnalyzerLoader.prepare()`      | The authored stable `analyze()` capability is callable               |
+| Async        | `componentGpuAnalyzerAsyncLoader.prepare()` | The authored async `analyze()` capability is callable                |
+| Shared frame | `componentGpuFrameAnalyzerLoader.prepare()` | Synchronous authored `encode()` is callable before an encoder exists |
 
-A `null` result from the current loader is an unclassified preparation failure
-unless an independent capability probe establishes `unsupported`. In
-particular, an async JSPI probe that returns false proves an unsupported async
-environment; stable or frame `null` and async `null` after a successful probe
-remain failed or unavailable with an opaque cause. The target loader contract
-will expose typed outcomes directly. The harness must not create a second
-component-loading implementation merely to recover swallowed provider errors.
+Every loader returns a typed `ready`, `unsupported`, or `failed` outcome and
+retains that same result. There is no public retry or loader-disposal path. The
+async loader itself checks the exact `WebAssembly.Suspending` and
+`WebAssembly.promising` APIs before its private provider imports or evaluates
+the generated async world. The harness must not duplicate that probe or create
+a second component-loading mechanism.
 
 The required order is:
 
@@ -182,26 +193,26 @@ harness reports a qualified preparation outcome instead.
 ### Public component loader
 
 The page imports the package's authored public API rather than importing the
-current generated-provider output throughout the test:
+private provider output throughout the test:
 
-- `loadAnalysisComponent()` only for an optional separate non-GPU boundary
-  diagnostic, never as GPU-component readiness evidence;
-- `loadComponentGpuAnalyzer()`, `configureGpuAnalysisSummaryResolver()`, and
-  `runComponentGpuAnalysis()` for stable execution;
-- `supportsComponentGpuAnalyzerAsync()`,
-  `loadComponentGpuAnalyzerAsync()`, and
-  `runComponentGpuAnalysisAsync()` for the JSPI variant;
-- `loadComponentGpuFrameAnalyzer()` and
-  `encodeComponentGpuFrameAnalysis()` for shared-frame execution.
+- `/analysis` and `analysisComponentLoader` only for an optional separate
+  non-GPU diagnostic, never as GPU-component readiness evidence;
+- `/gpu-analysis`, `componentGpuAnalyzerLoader`, and ready-capability
+  `analyze(input, { summaryResolver, observer? })` for stable execution;
+- `/gpu-analysis-async`, `componentGpuAnalyzerAsyncLoader`, and
+  ready-capability `analyze(input, { observer? })` for the JSPI variant;
+- `/gpu-analysis-frame`, `componentGpuFrameAnalyzerLoader`, and synchronous
+  ready-capability `encode(input, encoder, { summaryResolver, observer? })` for
+  shared-frame execution.
 
 This preserves the same handle registration, result translation, and cleanup
 scope used by a direct package consumer.
 
 ### Generated module adapter
 
-For the current JCO compatibility provider, `component-loader/src/generated.ts`
-remains the only authored adapter to `pkg/generated/`. Browser test files must
-not introduce their own scattered imports into generated package internals.
+Each file under `component-loader/src/providers/` is the only authored adapter
+for its matching generated world. Browser test files must not introduce their
+own scattered imports into generated package internals.
 
 A private H1 proof artifact may require one test-only generated entrypoint
 later. That entrypoint must remain isolated, unpublished, and mapped to the
@@ -217,7 +228,7 @@ translation, encoder ownership checks, mapping behavior, or queue behavior.
 ### Existing neutral fixture data
 
 Small constants or records may be reused when they describe input facts rather
-than a complete compatibility workflow. Current mixed-workload plans, summary
+than a complete mixed-workload workflow. Current mixed-workload plans, summary
 sizes, and ten-dispatch expectations remain owned by the component-boundary
 suite and are not automatically lifetime contracts.
 
@@ -258,7 +269,7 @@ The fixture does not own:
 - component-created intermediate buffers;
 - component-created renderer outputs before transfer;
 - summary buffers before their variant-specific transfer;
-- guest, Component Model, or compatibility-provider wrapper disposal;
+- component-module loading or provider reset;
 - component-owned stable or async encoders;
 - pipelines or bind groups created by guest-imported device calls.
 
@@ -273,7 +284,7 @@ The fixture does not own:
 | Shared-frame encoder                  | Browser scheduler fixture       | Browser scheduler; temporarily projected to component | Browser scheduler                                              | Browser scheduler abandons or finishes/submits   |
 | Component intermediate                | Component host on guest request | Component invocation or private session               | Not transferred                                                | Component/session policy selected after evidence |
 | Visual, border, and discovery outputs | Component host on guest request | Component until validated extraction                  | Browser result                                                 | Common result cleanup                            |
-| Stable summary buffers                | Component host on guest request | Component until loader transfer                       | Configured browser resolver                                    | Stable resolver                                  |
+| Stable summary buffers                | Component host on guest request | Invocation adapter until resolver handoff             | Call-local browser resolver                                    | Call-local stable resolver                       |
 | Async summary buffers                 | Component host on guest request | Async guest/host path                                 | No native buffers returned after decode                        | Async path after map/copy/unmap                  |
 | Frame summary buffers                 | Component host on guest request | Pending-summary object                                | Resolver after submitted transfer, or pending summary on abort | Resolver or pending-summary disposal             |
 
@@ -304,7 +315,7 @@ added later as separate semantic scenarios.
 
 ### Proposed reference buffer
 
-The compatibility worlds currently require at least one reference record. A
+The current GPU worlds require at least one reference record. A
 one-node fixture needs 48 bytes:
 
 | Byte range | Type  | Initial value                     |
@@ -380,12 +391,12 @@ remain owned by focused layout/algorithm tests and later consumer acceptance.
 
 ### Why not begin with the shared 200×100 fixture
 
-The existing six-node fixture protects a compatibility contract shared across
+The existing six-node fixture protects a baseline contract shared across
 Rust, component-boundary, and Millipede tests. It brings diagnostic summary,
 layout-tree, and larger-workload assumptions that are not required to prove the
 first browser lifetime boundary.
 
-The browser harness may add it later as realistic compatibility acceptance.
+The browser harness may add it later as realistic full-workload acceptance.
 It should not make that fixture the foundation for every lifetime experiment.
 
 ## Raw WebGPU observer self-check
@@ -419,12 +430,11 @@ sequenceDiagram
   participant Resolver as Summary resolver
 
   rect rgb(245, 245, 245)
-    Page->>Loader: await loadComponentGpuAnalyzer()
-    Loader-->>Page: callable stable capability ready
+    Page->>Loader: await componentGpuAnalyzerLoader.prepare()
+    Loader-->>Page: ready capability
   end
   Note over Page,GPU: Arm measurement capture after ready
-  Page->>Loader: configureGpuAnalysisSummaryResolver(resolver)
-  Page->>Loader: runComponentGpuAnalysis(input)
+  Page->>Loader: capability.analyze(input, { summaryResolver })
   Loader->>Guest: analyze(device, texture, truth, request)
   Guest->>GPU: create resources and encoder
   Guest->>GPU: record compute pass and summary copy
@@ -465,10 +475,10 @@ The exact same resolver function is passed to shared-frame execution. Async
 does not use it; preserving the real JSPI mapping and Rust-side decode is part
 of that variant's evidence.
 
-`configureGpuAnalysisSummaryResolver()` is module-global loader state. Stable
-scenarios with different devices or resolver behavior must be serialized in a
-page and clear the resolver with `null` in an outer `finally`. The harness must
-not introduce a test-only production reset API.
+The resolver is a call-local dependency. Stable scenarios with different
+devices or resolver behavior cannot overwrite one another through module-global
+state. The harness still serializes scenarios unless concurrency is the named
+subject because they otherwise share observation and fixture ownership.
 
 ## Async lifecycle
 
@@ -480,12 +490,11 @@ sequenceDiagram
   participant GPU as GPUDevice/Queue
 
   rect rgb(245, 245, 245)
-    Page->>Loader: supportsComponentGpuAnalyzerAsync()
-    Page->>Loader: await loadComponentGpuAnalyzerAsync()
-    Loader-->>Page: callable async capability ready
+    Page->>Loader: await componentGpuAnalyzerAsyncLoader.prepare()
+    Loader-->>Page: ready or typed unsupported/failed
   end
   Note over Page,GPU: Arm measurement capture after ready
-  Page->>Loader: runComponentGpuAnalysisAsync(input)
+  Page->>Loader: capability.analyze(input, { observer })
   Loader->>Guest: analyze(...) across JSPI
   Guest->>GPU: create, record, finish, and submit
   Guest->>GPU: await submitted work
@@ -495,9 +504,12 @@ sequenceDiagram
   Page->>GPU: destroy outputs when result owner disposes
 ```
 
-JSPI absence is an unsupported capability result, not a test failure, unless a
-specific test environment promises JSPI support. Output ownership must be
-checked after the awaited call rather than generalized from stable behavior.
+The loader checks `WebAssembly.Suspending` and `WebAssembly.promising` before
+the provider imports or evaluates the generated async world. Their absence is
+an unsupported capability result, not a test failure, unless a specific
+environment promises JSPI support.
+Output ownership must be checked after the awaited call rather than
+generalized from stable behavior.
 
 ## Shared-frame lifecycle
 
@@ -510,12 +522,12 @@ sequenceDiagram
   participant Queue as GPUQueue
 
   rect rgb(245, 245, 245)
-    Page->>Loader: await loadComponentGpuFrameAnalyzer()
-    Loader-->>Page: callable frame capability ready
+    Page->>Loader: await componentGpuFrameAnalyzerLoader.prepare()
+    Loader-->>Page: ready capability
   end
   Note over Page,Queue: Arm measurement capture after ready
   Page->>Encoder: device.createCommandEncoder()
-  Page->>Loader: encodeComponentGpuFrameAnalysis(input, encoder, resolver)
+  Page->>Loader: capability.encode(input, encoder, { summaryResolver })
   Loader->>Guest: encode(borrowed encoder, ...)
   Guest->>Encoder: begin/end compute pass and append summary copy
   Guest-->>Loader: pending summary + output handles
@@ -529,7 +541,8 @@ sequenceDiagram
 The shared-frame driver is the scheduler for this isolated test. It must prove
 that the component does not finish or submit the borrowed encoder and that
 commands remain valid after the component export and transient wrappers have
-returned.
+returned. The frame world omits command-encoder `finish` and `gpu-queue`; those
+operations are not available to the component in this execution variant.
 
 The abort branch is different:
 
@@ -545,6 +558,11 @@ encode into scheduler-owned encoder
 The harness must never destroy a buffer while it remains referenced by an
 encoder that might still be submitted.
 
+The same abandonment rule applies when `encode()` throws. The scheduler must
+not append more commands, finish, or submit that encoder; projection cleanup
+can release component-owned outputs but cannot roll back native commands that
+were already recorded.
+
 ## Common variant boundary
 
 When more than one variant exists, a small driver may normalize only the
@@ -557,8 +575,7 @@ type BrowserVariantPreparation =
       status: "unsupported";
       reason: { code: string; message: string };
     }
-  | { status: "failed"; error: Error }
-  | { status: "disposed" };
+  | { status: "failed"; error: Error };
 
 interface BrowserVariantDriver {
   readonly id: "stable" | "async" | "shared-frame";
@@ -573,7 +590,7 @@ interface BrowserVariantDriver {
 This is a harness projection of the loader's
 `ComponentCapabilityPrepareResult<T>`. It deliberately removes the ready
 capability because the variant driver owns that private callable interface,
-but it preserves every terminal status and the structured unsupported/failure
+but it preserves every settled status and the structured unsupported/failure
 evidence.
 
 This is not a requirement to implement an inheritance hierarchy or a universal
@@ -750,7 +767,7 @@ run identity, and phase metadata.
 Some code must remain separate because sharing it would erase an ownership
 boundary:
 
-- stable's configured summary resolver;
+- stable's invocation-local summary resolver passed through `analyze()` options;
 - async's JSPI support and awaited return;
 - shared-frame's scheduler encoder and submit/abort choice;
 - private proof bindings that are not product exports;
@@ -760,18 +777,18 @@ boundary:
 
 ### Reuse without modification
 
-| Existing code                          | Harness use                                                                                                    |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Root npm-package facade                | Imported by the browser page                                                                                   |
-| Authored loader                        | Prepares the selected callable capability through that facade                                                  |
-| Current JCO-generated provider         | Reached only through the authored loader; recorded as provenance, not measured internally                      |
-| Browser `wasi:webgpu` host             | Reached through the selected component's real import mappings                                                  |
-| Stable preparation and runner          | `loadComponentGpuAnalyzer()` and `runComponentGpuAnalysis()`                                                   |
-| Async probe, preparation, and runner   | `supportsComponentGpuAnalyzerAsync()`, `loadComponentGpuAnalyzerAsync()`, and `runComponentGpuAnalysisAsync()` |
-| Shared-frame preparation and recording | `loadComponentGpuFrameAnalyzer()` and `encodeComponentGpuFrameAnalysis()`                                      |
-| Public TypeScript contracts            | Imported from the root package                                                                                 |
-| Component-boundary suite               | Retained as the deterministic structural and failure layer                                                     |
-| Existing larger test fixtures          | Added later for compatibility growth, not used as the initial lifetime contract                                |
+| Existing code                      | Harness use                                                                                  |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- |
+| Selected runtime package subpath   | Imported by the browser page; the type-only root is not a runtime facade                     |
+| Authored variant loader            | Prepares and returns the selected direct callable capability                                 |
+| Private selected-world provider    | Reached only through its authored loader; recorded as provenance, not measured internally    |
+| Browser `wasi:webgpu` host         | Reached through the selected component's real import mappings                                |
+| Stable loader and capability       | `componentGpuAnalyzerLoader.prepare()`, then ready-capability `analyze(...)`                 |
+| Async loader and capability        | `componentGpuAnalyzerAsyncLoader.prepare()`, then ready-capability `analyze(...)`            |
+| Shared-frame loader and capability | `componentGpuFrameAnalyzerLoader.prepare()`, then synchronous ready-capability `encode(...)` |
+| Public TypeScript contracts        | Imported from the selected subpath or the type-only root                                     |
+| Component-boundary suite           | Retained as the deterministic structural and failure layer                                   |
+| Existing larger test fixtures      | Added later for workload growth, not used as the initial lifetime contract                   |
 
 ### Implement once inside the harness
 
@@ -788,12 +805,12 @@ boundary:
 ### Do not reuse by private source import
 
 The isolated harness must not import private files from
-`@millipede/surface-inspector-browser`,
-`@millipede/surface-inspector-wasm`, or
-`@millipede/surface-inspector-wasm-host`. Those packages are real consumer
-implementations, but importing their source would pull capture, state,
-scheduling, rendering, and compatibility policy into the component-local
-proof. They remain appropriate later as an unchanged black-box system.
+`@millipede/surface-inspector-browser`. That package is the consumer
+implementation, and importing its source would pull device adapters, capture,
+state, scheduling, rendering, and selection policy into the component-local
+proof. It remains appropriate later as an unchanged black-box system. There is
+no separate `surface-inspector-wasm` consumer package or mutable backend
+registry.
 
 ## Planned file growth
 
@@ -849,14 +866,26 @@ observation before the page loads:
 ```text
 component-owned runner
     → unchanged Millipede URL
-    → existing surface-inspector-wasm registration
-    → existing compatibility host
+    → lazily selected browser-owned stable, async, or shared-frame adapter
+    → exact inspector-component runtime subpath
     → this package's component loader
 ```
 
-That mode confirms consumer integration. It must not replace the isolated
-proof, and it must not require committing H1 instrumentation into Millipede's
-production workspaces.
+Millipede now uses that direct-loader path: `surface-inspector-browser` owns the
+three explicit adapter implementations and dynamically imports only the one
+selected. That adapter imports the matching stable, async, or shared-frame
+component subpath, retains its ready capability, and binds it to the current
+GPU-device generation. Retiring the device adapter does not reset the
+module-wide loader.
+
+The optional invocation-observer parameter remains at each adapter boundary,
+although the current application supplies none. Its selection/session
+generation is also still pending: an adapter's retirement guard alone cannot
+cancel in-flight preparation or invocation, reject stale publication, or clean
+up late outputs and pending summaries. This future acceptance mode verifies the
+deployed behavior and C1/V1 request inventory. It must not replace the isolated
+H1 proof or require committing H1 instrumentation into Millipede's production
+workspaces.
 
 ## Future native `wgpu` boundary
 
@@ -879,18 +908,23 @@ native execution into one implementation abstraction prematurely.
 
 ## Source ownership map
 
-| Source                                                                                      | Responsibility                                                                         |
-| ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [`component-loader/src/index.ts`](../../../component-loader/src/index.ts)                   | Public stable/async facade, memoized loading, input registration, and output transfer  |
-| [`component-loader/src/frame.ts`](../../../component-loader/src/frame.ts)                   | Frame preload, borrowed encoder registration, synchronous outputs, and pending summary |
-| [`component-loader/src/generated.ts`](../../../component-loader/src/generated.ts)           | Current provider-specific adapter to JCO-generated modules; outside measured execution |
-| [`component-loader/src/host/gpu-types.ts`](../../../component-loader/src/host/gpu-types.ts) | Inputs, outputs, resolver, submission, and pending-summary contracts                   |
-| [`component-loader/src/host/gpu.ts`](../../../component-loader/src/host/gpu.ts)             | Plan correlation, native output extraction, and stable/frame summary lifecycle         |
-| [`component-loader/src/host/webgpu/`](../../../component-loader/src/host/webgpu/)           | Production browser implementation of imported `wasi:webgpu` resources                  |
-| [`tests/component-boundary/`](../../../tests/component-boundary/)                           | Deterministic fake-host and generated-component evidence                               |
-| Planned `tests/browser-lifetime/`                                                           | Real Chromium execution, ownership, and measurement evidence                           |
-| Millipede `surface-inspector-wasm`                                                          | Existing consumer adapters; unchanged by the initial harness                           |
-| Millipede `surface-inspector-browser`                                                       | Capture, scheduling, rendering, and later unchanged acceptance                         |
+| Source                                                                                                        | Responsibility                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`component-loader/src/index.ts`](../../../component-loader/src/index.ts)                                     | Shared type-only package root                                                                                                                             |
+| [`component-loader/src/gpu-analysis.ts`](../../../component-loader/src/gpu-analysis.ts)                       | Stable loader, direct capability, call-local resolver, and output transfer                                                                                |
+| [`component-loader/src/gpu-analysis-async.ts`](../../../component-loader/src/gpu-analysis-async.ts)           | Async loader, loader-owned JSPI gate, direct capability, and output transfer                                                                              |
+| [`component-loader/src/gpu-analysis-frame.ts`](../../../component-loader/src/gpu-analysis-frame.ts)           | Frame loader, borrowed-encoder capability, synchronous outputs, pending summary                                                                           |
+| [`component-loader/src/providers/`](../../../component-loader/src/providers/)                                 | Private generated-world adapters, one per capability family                                                                                               |
+| [`component-loader/src/gpu-analysis-dispatch.ts`](../../../component-loader/src/gpu-analysis-dispatch.ts)     | Variant-neutral request metadata construction                                                                                                             |
+| [`component-loader/src/host/gpu-types.ts`](../../../component-loader/src/host/gpu-types.ts)                   | Inputs, outputs, resolver, submission, and pending-summary contracts                                                                                      |
+| [`component-loader/src/host/gpu-output-set.ts`](../../../component-loader/src/host/gpu-output-set.ts)         | Canonical renderer-output ownership shape and exhaustive traversal                                                                                        |
+| [`component-loader/src/host/gpu-output.ts`](../../../component-loader/src/host/gpu-output.ts)                 | Variant-neutral plan correlation and native output extraction                                                                                             |
+| [`component-loader/src/host/gpu-summary-stable.ts`](../../../component-loader/src/host/gpu-summary-stable.ts) | Stable-world summary validation and resolver ownership transfer                                                                                           |
+| [`component-loader/src/host/gpu-summary-frame.ts`](../../../component-loader/src/host/gpu-summary-frame.ts)   | Shared-frame pending-summary lifecycle                                                                                                                    |
+| [`component-loader/src/host/webgpu/`](../../../component-loader/src/host/webgpu/)                             | Production browser implementation and temporary registry for imported `wasi:webgpu` resources                                                             |
+| [`tests/component-boundary/`](../../../tests/component-boundary/)                                             | Deterministic fake-host and generated-component evidence                                                                                                  |
+| Planned `tests/browser-lifetime/`                                                                             | Real Chromium execution, ownership, and measurement evidence                                                                                              |
+| Millipede `surface-inspector-browser`                                                                         | Three exact lazy device adapters, explicit diagnostics, preparation/retirement, capture, selection, scheduling, rendering, and later black-box acceptance |
 
 ## Architectural invariants
 

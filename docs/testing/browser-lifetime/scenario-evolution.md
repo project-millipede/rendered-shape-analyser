@@ -148,12 +148,10 @@ and mapping behavior.
 prepare selected stable component and require callable capability
     → arm post-ready observation and timing
     → create raw browser fixture
-    → configure stable summary resolver
-    → call runComponentGpuAnalysis(input)
+    → call readyCapability.analyze(input, { summaryResolver, observer })
     → reach resolver completion and staging readback
     → receive transferred renderer-facing outputs
     → release outputs through browser owner
-    → in an outer finally, configureGpuAnalysisSummaryResolver(null)
     → dispose fixture resources
 ```
 
@@ -172,8 +170,8 @@ prepare selected stable component and require callable capability
    implied by JavaScript reachability.
 7. Browser-owned output cleanup is harmless when invoked according to its
    documented ownership boundary.
-8. The module-global stable summary resolver is cleared even when invocation,
-   readback, validation, or output handling fails.
+8. The invocation-local summary resolver is released with its fixture even when
+   invocation, readback, validation, or output handling fails.
 
 ### Initial observations
 
@@ -221,7 +219,9 @@ unsubmitted.
 require prepared callable frame capability
     → arm post-ready observation and timing
     → create scheduler-owned encoder from fixture device
-    → call encodeComponentGpuFrameAnalysis synchronously
+    → call readyCapability.encode(
+        input, encoder, { summaryResolver, observer }
+      ) synchronously
     → observe component return with pending summary and outputs
     → finish the same encoder in the harness
     → submit once through the fixture queue
@@ -238,6 +238,10 @@ require prepared callable frame capability
 5. Submitted commands complete without validation errors after transient guest
    and host wrappers have returned.
 6. Pending summary resolution begins only after scheduler submission.
+
+The frame world omits command-encoder `finish` and `gpu-queue`. The component
+cannot acquire either operation through this variant's imports; the harness
+retains sole finish and submission authority.
 
 ### Abort action
 
@@ -295,16 +299,19 @@ behavior rather than assuming stable evidence applies across an `await`.
 ### Action
 
 ```text
-probe JSPI support
-    ├── unsupported → record unsupported result
-    └── supported
-            → prepare selected async component and require callable capability
+prepare selected async component
+    ├── loader returns unsupported → record unsupported result
+    └── loader returns ready
             → arm post-ready observation and timing
-            → call runComponentGpuAnalysisAsync(input)
+            → call readyCapability.analyze(input, { observer })
             → await component submission/completion/readback
             → receive decoded summary and outputs
             → release outputs
 ```
+
+The async loader checks the exact `WebAssembly.Suspending` and
+`WebAssembly.promising` APIs before its provider imports or evaluates the
+generated async world. The scenario does not repeat that support probe.
 
 ### Initial gating assertions
 
@@ -357,8 +364,8 @@ destroy state.
 
 1. Browser-owned device, texture, reference buffer, and scheduler encoder are
    never destroyed by component cleanup.
-2. Generic Component Model/provider resource release is not reported as native
-   destruction.
+2. Component Model wrapper or host-registry identity release is not reported
+   as native destruction.
 3. Successfully transferred outputs are not destroyed by the component.
 4. Explicit cleanup is idempotent.
 5. Cleanup from one device generation cannot target another generation.
@@ -460,7 +467,7 @@ proof must not force one completion shape onto all variants:
 - Adding it to `scripts/sync.sh` product worlds.
 - Treating maximum reuse as selected production policy.
 - Adding diagnostics to a discovery-only proof merely to reuse the mixed
-  compatibility fixture.
+  workload fixture.
 
 ### Exit condition
 
@@ -573,7 +580,7 @@ the core proof.
 3. Larger captured textures.
 4. Repeated compatible captures.
 5. Realistic captured-pixel patterns.
-6. Existing shared 200×100 compatibility fixture.
+6. Existing shared 200×100 baseline fixture.
 7. Unchanged Millipede application route.
 
 Each fixture is added for a named semantic or lifecycle reason. Fixture growth

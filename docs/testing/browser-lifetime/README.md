@@ -1,13 +1,15 @@
 # Real-browser WebGPU lifetime testing
 
 > - **Status:** Design specification; implementation pending
-> - **Last reviewed:** 2026-08-10
+> - **Last reviewed:** 2026-08-11
 > - **Applies to:** Real-browser lifetime evidence for component-backed GPU
 >   execution
 > - **Current runtime target:** Chromium WebGPU
-> - **Roadmap context:** H1 resource-lifetime evidence before R2-C and P2
+> - **Roadmap context:** H1 resource-lifetime evidence before R2-C and the P2
+>   final discovery topology
 > - **Implementation owner:** Rendered Shape Analyser repository
-> - **Consumer acceptance target:** Existing Millipede browser runtime, unchanged
+> - **Consumer acceptance target:** Current adopted Millipede browser runtime,
+>   without harness-specific changes
 
 This document set defines how the Rendered Shape Analyser will obtain
 real-browser evidence about WebGPU resource ownership, command lifetimes,
@@ -40,11 +42,10 @@ select one component variant
 ```
 
 The preparation mechanism is an opaque, untimed prerequisite. The current
-build still exercises its real JCO-generated compatibility provider, but that
-provider's internal modules, request topology, compilation steps, and timing do
-not define H1 metrics or architectural invariants. Provider identity, component
-artifact identity, and toolchain version may be retained as baseline
-provenance.
+build still exercises its real private provider, but that provider's internal
+modules, request topology, compilation steps, and timing do not define H1
+metrics or architectural invariants. Provider identity, component artifact
+identity, and toolchain version may be retained as baseline provenance.
 
 Instrumentation plumbing may be installed before preparation when it must wrap
 browser APIs or satisfy component imports. Until the loader reports a callable
@@ -91,9 +92,9 @@ These local documents do not replace that plan. They translate its evidence
 requirements into a maintainable test architecture inside the repository that
 owns the component and browser host implementation.
 
-The external H1 documents still contain procedures written specifically for
-the current JCO compatibility provider. Before H1 can be declared complete,
-those procedures must be updated or explicitly reclassified as temporary
+The external H1 documents still contain provider-specific preparation
+procedures. Before H1 can be declared complete, those procedures must be
+updated or explicitly reclassified as temporary
 provider-conformance evidence. They are not runtime metrics, permanent
 architecture, or requirements inherited by a future native component provider.
 
@@ -152,7 +153,7 @@ Browser evidence must exercise this path:
 ```text
 selected component variant
     → authored component loader
-    → private component provider (currently JCO-generated)
+    → private selected-world provider
     → callable component capability
     → real browser-owned WebGPU inputs
     → authored wasi:webgpu browser host
@@ -161,9 +162,9 @@ selected component variant
 
 The harness must not replace any layer with a test-specific implementation
 when that layer is itself part of the lifetime claim. It exercises the current
-compatibility provider to reach the genuine capability, but measurements begin
-after that provider has completed and concern the component, authored host, and
-real WebGPU execution boundary.
+private provider to reach the genuine capability, but measurements begin after
+that provider has completed and concern the component, authored host, and real
+WebGPU execution boundary.
 
 ### 2. Begin with the smallest valid real workload
 
@@ -184,7 +185,7 @@ invent their own device and input-resource preparation.
 The three execution variants differ in completion and encoder ownership:
 
 - stable owns encoder creation, finish, and submission, then delegates compact
-  summary readback to a configured browser resolver;
+  summary readback to the invocation-local browser resolver;
 - async owns encoder creation, finish, submission, completion waiting, mapping,
   and summary decoding across JSPI;
 - shared-frame borrows a scheduler encoder synchronously and must neither
@@ -239,8 +240,7 @@ required evidence. See the
 
 The canonical harness belongs in this repository. It may later point at an
 unchanged Millipede test URL for black-box acceptance, but the core proof must
-not depend on editing Millipede's browser, wasm adapter, or compatibility
-facade packages.
+not depend on editing Millipede's browser or wasm integration packages.
 
 ## Planned repository placement
 
@@ -294,9 +294,11 @@ This documentation does not authorize:
 7. A native `wgpu` implementation as a substitute for Chromium evidence.
 8. A production-sized fixture as a prerequisite for the first valid proof.
 
-H1 establishes supported lifetime behavior and measurements. R2-C selects the
-production execution and packaging contract. P2 implements the selected
-permanent component and loader boundary.
+H1 establishes supported lifetime behavior and measurements. Millipede already
+uses explicit lazy registration, direct selected loaders, and device-generation
+adapter retirement. R2-C selects the production execution and packaging
+contract, while P2 finalizes the discovery/session/resource topology. C1/V1
+still supplies the actual Chromium request inventory for deployed isolation.
 
 ## Terminology
 
@@ -305,7 +307,7 @@ permanent component and loader boundary.
 | Browser-owned input        | A device, texture, reference buffer, or scheduler encoder created and ultimately disposed by the browser fixture or consumer |
 | Component-created resource | A native WebGPU object created because the guest invoked an imported `wasi:webgpu` operation                                 |
 | Transferred output         | A component-created output whose native ownership has moved to the browser result owner                                      |
-| Wrapper release            | Rust, Component Model, compatibility-provider, or host-registry identity release; not automatically native destruction       |
+| Wrapper release            | Rust resource drop, Component Model wrapper release, or host-registry identity release; not automatically native destruction |
 | Explicit destruction       | An owner-authorized native `GPUBuffer.destroy()` operation                                                                   |
 | Observation                | Collected evidence that is not, by itself, a regression requirement                                                          |
 | Invariant                  | Stable semantic behavior that may gate the regression suite                                                                  |

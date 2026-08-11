@@ -1,7 +1,7 @@
 # R2-C comparison and decision contract
 
 > - **Status:** Planned evidence and decision schema; no candidate selected
-> - **Last reviewed:** 2026-08-10
+> - **Last reviewed:** 2026-08-11
 > - **Applies after:** H1 has produced valid real-browser lifetime evidence
 > - **Local responsibility:** Comparable evidence and a decision-ready R2-C
 >   evidence summary
@@ -291,7 +291,7 @@ must use normalized milestones whose meanings are the same across candidates.
 | Queue submitter               | Component/host path                                                                        | Component/host path                                 | Browser scheduler                                                |
 | Export return means           | Component recording/submission and stable handoff reached                                  | Awaited async export reached its defined completion | Recording returned; no submission implied                        |
 | Queue settlement owner        | Resolver/consumer when required                                                            | Async path when its contract awaits completion      | Browser scheduler/consumer                                       |
-| Summary completion            | Configured resolver after transfer                                                         | Inside awaited mapping/decode path                  | Pending summary after scheduler submission, or disposal on abort |
+| Summary completion            | Invocation-local `analyze()` option resolver after transfer                                | Inside awaited mapping/decode path                  | Pending summary after scheduler submission, or disposal on abort |
 | Abort authority               | Stable invocation/resolver policy                                                          | Async invocation policy                             | Browser scheduler owns unsubmitted encoder abandonment           |
 | Valid cross-variant milestone | Output published, matching submission settled, matching summary ready, first rendered edge | Same                                                | Same after scheduler submission                                  |
 
