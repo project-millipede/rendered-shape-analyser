@@ -1,8 +1,9 @@
 /**
- * Chrome/JSPI-only upstream WebGPU error-scope helpers.
+ * JSPI-generated async-world WebGPU error-scope helpers.
  *
- * Browser error scopes are naturally promise-shaped when popped, so these
- * helpers stay out of the stable `component-gpu` path.
+ * Browser error scopes are naturally promise-shaped when popped. The stable
+ * generated world does not expose or invoke these async methods, although the
+ * current canonical host module implements the combined variant surface.
  */
 
 import type * as GeneratedAsyncWebGpu from "../../../../../pkg/generated/gpu-analysis-async/interfaces/wasi-webgpu-webgpu";
@@ -32,7 +33,7 @@ export function pushBrowserErrorScope(
  * 1. Awaits the real browser `GPUDevice.popErrorScope()` promise.
  * 2. Returns the browser error message when WebGPU reports a validation issue.
  * 3. Returns the local clean-scope sentinel while this async resource-result
- *    shape remains isolated behind the Chrome/JSPI backend.
+ *    shape remains isolated behind the JSPI async variant.
  *
  * @param device - Browser WebGPU device represented by the upstream handle.
  * @returns Error message, or the clean-scope sentinel when no error occurred.
@@ -48,7 +49,7 @@ export async function popBrowserErrorScopeMessage(
  * Create the generated WIT error record for a failed pop operation.
  *
  * 1. Keeps the object shape exactly aligned with jco-generated declarations.
- * 2. Avoids broad `any` or `unknown` types at the authored boundary.
+ * 2. Avoids unsafe `any` at the authored boundary.
  * 3. Lets callers narrow thrown JavaScript values before choosing the message.
  *
  * @param message - Human-readable failure reason.

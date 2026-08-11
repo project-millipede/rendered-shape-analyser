@@ -1,5 +1,6 @@
 /**
- * Synchronous upstream `wasi:webgpu` metadata operations used by both GPU paths.
+ * Synchronous upstream `wasi:webgpu` metadata operations shared by the stable,
+ * async, and frame GPU variants.
  *
  * These helpers intentionally contain only browser WebGPU properties that are
  * synchronous in the real API and synchronous in upstream `webgpu.wit`.
@@ -10,7 +11,8 @@
  *
  * 1. Reads only metadata from the already registered browser `GPUTexture`.
  * 2. Does not map, copy, or inspect texel contents.
- * 3. Is shared by stable `component-gpu` and Chrome/JSPI `component-gpu-async`.
+ * 3. Is shared by stable `component-gpu`, JSPI `component-gpu-async`, and
+ *    borrowed-encoder `component-gpu-frame`.
  *
  * @param texture - Browser texture represented by an upstream WIT resource.
  * @returns Texture width in texels.
@@ -24,7 +26,8 @@ export function readBrowserTextureWidth(texture: GPUTexture): number {
  *
  * 1. Reads only metadata from the already registered browser `GPUTexture`.
  * 2. Does not map, copy, or inspect texel contents.
- * 3. Is shared by stable `component-gpu` and Chrome/JSPI `component-gpu-async`.
+ * 3. Is shared by stable `component-gpu`, JSPI `component-gpu-async`, and
+ *    borrowed-encoder `component-gpu-frame`.
  *
  * @param texture - Browser texture represented by an upstream WIT resource.
  * @returns Texture height in texels.
@@ -40,6 +43,8 @@ export function readBrowserTextureHeight(texture: GPUTexture): number {
  * 2. Does not map the buffer or copy buffer contents.
  * 3. Lets Rust validate component-reference buffer capacity without inventing a
  *    project-specific buffer-size bridge.
+ * 4. Is shared by stable `component-gpu`, JSPI `component-gpu-async`, and
+ *    borrowed-encoder `component-gpu-frame`.
  *
  * @param buffer - Browser buffer represented by an upstream WIT resource.
  * @returns Buffer size in bytes.

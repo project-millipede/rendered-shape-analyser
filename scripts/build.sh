@@ -3,7 +3,7 @@
 #
 # 1. Build an analysis-only component for all browsers.
 # 2. Build the self-submitting stable GPU-analysis component.
-# 3. Build a Chrome/JSPI-only async GPU-analysis component.
+# 3. Build a JSPI-only async GPU-analysis component.
 # 4. Build the isolated scheduler-owned shared-frame GPU component.
 # 5. Build a full component with WASI 0.3 async proofs for JSPI-capable runtimes.
 # 6. Lift each core wasm to a component: wit-bindgen already embedded the
@@ -75,7 +75,7 @@ wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm
 echo "--- gpu-analysis world (browser-safe; verify: required wasi:webgpu operations only) ---"
 wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis.wasm"
 
-echo "--- gpu-analysis-async world (Chrome/JSPI-only; verify: upstream async buffer readback) ---"
+echo "--- gpu-analysis-async world (JSPI-only; verify: upstream async buffer readback) ---"
 wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-async.wasm"
 
 echo "--- gpu-analysis-frame world (verify: no encoder finish or gpu-queue submit import) ---"

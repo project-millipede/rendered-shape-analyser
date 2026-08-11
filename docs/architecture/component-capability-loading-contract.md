@@ -1,8 +1,8 @@
 # Component capability loading contract
 
-> - **Status:** Local lifecycle foundation implemented; consumer migration and
->   final topology pending
-> - **Last reviewed:** 2026-08-10
+> - **Status:** Direct local variant capabilities and explicit Millipede
+>   consumer adoption implemented
+> - **Last reviewed:** 2026-08-11
 > - **Applies to:** Browser component loading and capability readiness
 > - **Roadmap context:** H1 measurement prerequisite; final topology remains
 >   owned by R2-C and P2
@@ -15,17 +15,14 @@
 
 ## Decision
 
-The loader architecture is independent of the mechanism used to instantiate a
-WebAssembly Component.
+The loader architecture is independent of the private mechanism used to
+instantiate a WebAssembly Component. Generated-provider mechanics are not part
+of the public architecture, capability model, measurement model, or long-term
+loading contract; their canonical detailed treatment is the
+[tooling baseline](../tooling/jco-generated-artifact-baseline.md).
 
-JCO is a temporary browser compatibility implementation. It is not part of the
-public architecture, capability model, measurement model, or long-term loading
-contract.
-
-The target canonical build artifact is a WebAssembly Component and the
-canonical runtime output is a callable capability. The current packaged
-browser-consumed payload may still contain compatibility-lowered assets rather
-than the original component artifact:
+The canonical build artifact is a WebAssembly Component and the public runtime
+output is an authored callable capability:
 
 ```text
 select one component variant
@@ -36,28 +33,45 @@ select one component variant
 
 Everything before the callable capability is an opaque, untimed prerequisite.
 
-## Compatibility baseline and local foundation
+## Implemented loader and consumer adoption
 
-The local loader now implements the provider-neutral lifecycle while preserving
-the earlier nullable APIs. Consumer migration and final variant packaging remain
-later work.
+The local loader implements the provider-neutral lifecycle, direct authored
+capabilities, and per-world entry isolation. Millipede now adopts that contract
+through browser-owned lazy, selected-variant adapters.
 
-| Local state                                                              | Remaining limitation                                                 | Final target                                     |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------- | ------------------------------------------------ |
-| `generated.ts` alone adapts the current generated provider               | The provider has no meaningful instance-unload operation             | Provider stays private and replaceable           |
-| Typed loaders expose preparation, retry, state, and disposal             | Nullable `load*()` functions remain for compatibility                | Consumers use typed preparation                  |
-| Explicit retry creates a new logical preparation attempt                 | An evaluated ESM URL may retain a browser-cached rejection           | Retry semantics proven for the selected provider |
-| Millipede's compatibility `/auto` path still starts a detached self-test | Production activation still performs unrelated diagnostic work       | Consumer patch removes that side effect          |
-| `ready` provides an uncontaminated post-preparation boundary             | Existing Millipede callers do not yet use it as the measurement gate | Measurement begins only after typed `ready`      |
+| Implemented local contract                                                                              | Implemented Millipede adoption                                                                                      |
+| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| The root package entry exports types only                                                               | `surface-inspector-browser` owns three explicit device-local adapter modules                                        |
+| `/analysis`, `/gpu-analysis`, `/gpu-analysis-async`, and `/gpu-analysis-frame` isolate runtime families | Selecting a backend dynamically imports only its exact stable, async, or shared-frame adapter                       |
+| `providers/*.ts` privately adapt the matching generated world                                           | Each adapter imports the matching component subpath and calls that loader's one-shot `prepare()`                    |
+| Typed loaders return `ready`, `unsupported`, or `failed`                                                | Device-generation preparation preserves those outcomes and retires ready adapters independently                     |
+| `/diagnostics` is a side-effect-free WASI proof entry separate from analyzer entries                    | The explicit browser `/diagnostics` export remains outside ordinary backend selection                               |
+| `ready` provides the post-preparation measurement boundary                                              | Invocation and measurement eligibility begins only after selected preparation reports `ready`                       |
+| Stable and frame summary resolvers are invocation-local options                                         | Each call passes its device adapter's resolver; no module-global resolver or mutable backend registry is configured |
 
-This local foundation does not freeze the R2-C/P2 variant-entry topology or
-runtime factory ownership.
+This completes direct consumer-loader adoption. It does not select the final
+discovery/session/resource topology: R2-C and P2 still own that decision.
+The former `surface-inspector-wasm` wrapper package and mutable backend registry
+are not part of this design. H1 measurement and C1/V1 real-Chromium request
+inventory remain pending; C1/V1 is the authoritative proof that the deployed
+selected path does not request unselected JavaScript or Wasm assets.
+
+Each adapter continues to accept the optional component invocation observer so
+a future session composition can supply it without changing the component
+contract. The current application supplies no observer.
+
+The `/diagnostics` split isolates the explicit WASI async proofs. It does not
+separate GPU summary readback from the stable, async, or frame analyzer
+capabilities; those variants retain their current summary ownership contracts.
 
 ## Responsibility boundary
 
 ```text
-Millipede composition
-    | selects one variant
+Millipede selected backend
+    | dynamically imports one browser-owned adapter
+    v
+Selected device adapter
+    | imports the exact component subpath and prepares it
     v
 Selected variant entry
     | exposes explicit preparation
@@ -71,35 +85,106 @@ Prepared capability
 GPU preparation, invocation, publication, and cleanup
 ```
 
-| Owner                      | Responsibility                                                               |
-| -------------------------- | ---------------------------------------------------------------------------- |
-| Millipede composition      | Select one analyzer variant                                                  |
-| Selected variant entry     | Expose the preparation operation for that variant                            |
-| Private component provider | Instantiate the selected component through the currently supported mechanism |
-| Prepared capability        | Expose callable typed operations with no remaining loading work              |
-| GPU runtime and scheduler  | Own device generations, encoding, submission, publication, and retirement    |
-| Browser-lifetime harness   | Measure behavior only after component preparation succeeds                   |
+| Owner                      | Responsibility                                                                |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| Millipede composition      | Select one analyzer variant and lazily load its browser-owned adapter         |
+| Millipede device adapter   | Retain one ready capability for a GPU-device generation and retire it locally |
+| Selected variant entry     | Expose the preparation operation for that variant                             |
+| Private component provider | Instantiate the selected component through the currently supported mechanism  |
+| Prepared capability        | Expose callable typed operations with no remaining loading work               |
+| GPU runtime and scheduler  | Own device generations, encoding, submission, publication, and retirement     |
+| Browser-lifetime harness   | Measure behavior only after component preparation succeeds                    |
 
 The loader does not select GPU scheduling policy, own frame submission, or
 decide resource reuse.
+
+## Component instance and logical session boundary
+
+The current GPU capabilities do not require one independently instantiated
+component guest per Millipede session. Stable, async, and shared-frame calls
+receive their device and GPU inputs explicitly, and the current GPU guests do
+not retain authoritative cross-call session state. Per-invocation host resource
+identities and summary resolvers therefore do not require per-session component
+imports.
+
+The selected boundary is:
+
+```text
+one cached capability for the selected component variant
+    -> Millipede owns backend selection and device-generation control
+    -> each current invocation receives its exact device and resources
+    -> a future persistent GPU lifetime uses an explicit WIT session resource
+```
+
+Persistent state alone is not a reason to create another component instance.
+When persistent pipelines, buffers, bind groups, or GPU-side generation state
+are implemented, they should be owned by an explicit WIT resource such as
+`discovery-session`. Several logical session resources may coexist behind one
+cached component capability, and dropping a session must release the resources
+owned by that session. Millipede decides when a logical session is created,
+replaced, or dropped; the private provider only adapts the WIT resource
+lifecycle to its current runtime.
+
+### Target variant-switch sequence
+
+The following sequence is the selected target for Millipede's future
+session/selection controller; the current direct-adapter cutover does not yet
+implement it. Switching the selected analyzer should change Millipede's active
+runtime session without resetting or unloading either variant's component
+capability:
+
+```text
+select shared-frame
+    -> prepare or reuse the cached shared-frame capability
+    -> run with the current Millipede device generation
+
+switch to async
+    -> stop scheduling new shared-frame work
+    -> retire shared-frame pending, output, and device-session resources
+    -> prepare or reuse the cached async capability
+    -> leave the shared-frame component capability cached and callable
+
+switch back to shared-frame
+    -> reuse the existing ready shared-frame capability
+    -> create or rebind only the required device-local session resources
+```
+
+An in-flight operation is not cancelled by changing the selection. Millipede's
+session or selection generation must reject stale publication and clean up any
+late result through its actual output and pending-summary ownership paths. The
+capability loader does not gain an active-variant state and is not used to
+coordinate switching. When the future `discovery-session` WIT resource exists,
+Millipede drops or replaces that logical resource at the same boundary; the
+cached component capability remains prepared.
+
+That selection/session generation is not implemented by direct-adapter
+cleanup. Retiring an adapter prevents new calls and releases adapter-owned
+state, but output buffers, pending frame summaries, WIT projections, and future
+device-local sessions still require cleanup through their actual owners.
+
+Explicit per-instance provider construction remains deferred unless a concrete
+requirement cannot be represented by logical resources, for example:
+
+- different host import implementations for different sessions;
+- unavoidable guest-global state that must be reset by instance replacement;
+- hard guest-memory or fault isolation between sessions.
+
+The current architecture has none of those requirements. Provider-specific
+instance factories are not unload mechanisms, and discarded instances do not
+provide deterministic ESM or WebAssembly reclamation. A future native browser
+Component Model provider must preserve the same callable-capability and WIT
+session-resource semantics without exposing its instantiation mechanism to
+Millipede.
 
 ## Minimal lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> idle
-    idle --> preparing: prepare() or retry()
-    idle --> disposed: dispose()
+    idle --> preparing: prepare()
     preparing --> ready: callable capability produced
     preparing --> unsupported: required platform capability absent
     preparing --> failed: unexpected preparation failure
-    preparing --> disposed: dispose; quarantine late completion
-    unsupported --> preparing: explicit retry after environment change
-    failed --> preparing: explicit retry
-    unsupported --> disposed: dispose()
-    failed --> disposed: dispose()
-    ready --> disposed: dispose()
-    disposed --> [*]
 ```
 
 These are capability-loader states. They are not GPU-device,
@@ -107,17 +192,26 @@ command-submission, or shader-execution states.
 
 The implementation keeps this diagram executable as a pure transition
 function in `component-loader/src/capability-state.ts`. That file owns only the
-states, transition triggers, and legal transitions. The asynchronous controller
+states, transition triggers, and legal transitions. The asynchronous loader
 in `component-loader/src/capability.ts` applies those transitions while owning
-single-flight promises, provider calls, result publication, and cleanup.
+the single preparation Promise, provider call, result publication, and
+best-effort failure reporting.
 
-`ready` is entered only when an active preparation succeeds, and at most once
-during one loader lifetime. Calling `prepare()` again, calling `retry()` while
-already ready, or invoking normal capability operations reuses the same ready
-state and capability; none of those operations enters `ready` a second time.
-A loader that has not yet become ready gets another opportunity only through
-an explicit retry after `unsupported` or `failed`; a separately constructed
-loader has its own lifecycle.
+Each public variant entry owns one module-wide loader. `ready` is entered only
+when its sole preparation succeeds. Every concurrent or later `prepare()` call
+receives the same Promise and settled result, so normal capability operations
+never enter `ready` again.
+
+`unsupported` and `failed` are terminal for that imported module. Retrying the
+same browser ESM URL cannot reliably undo cached module evaluation or import
+failures, and the current generated provider has no component-unload or reset
+operation. A scenario that truly requires a fresh preparation loads a fresh
+page or an intentionally new, versioned module URL.
+
+The loader is therefore not disposable. This module lifetime is independent
+of Millipede's GPU-device and session lifetimes: Millipede still retires device
+generations, pending summaries, transferred outputs, and other browser-owned or
+component-owned GPU resources through their actual ownership APIs.
 
 ### State-machine vocabulary
 
@@ -125,43 +219,38 @@ loader has its own lifecycle.
 method call or provider outcome
     -> transition trigger
     -> pure state-transition record
-    -> controller stores nextState
+    -> loader stores nextState
 ```
 
 | Name                                   | Role                                                                  |
 | -------------------------------------- | --------------------------------------------------------------------- |
-| `ComponentCapabilityState`             | Current stored lifecycle value                                        |
+| `ComponentCapabilityState`             | Current stored preparation value                                      |
 | `ComponentCapabilityTransitionTrigger` | Input asking the pure function to evaluate one transition             |
 | `ComponentCapabilityStateTransition`   | Returned `previousState`, `nextState`, `trigger`, and `effect` record |
-| `ComponentCapabilityTransitionEffect`  | Classification of changed, unchanged, or late preparation handling    |
-| `ComponentCapabilityPrepareResult`     | Frozen outcome of one public `prepare()` or `retry()` call            |
+| `ComponentCapabilityTransitionEffect`  | Classification of a changed or unchanged state                        |
+| `ComponentCapabilityPrepareResult`     | Read-only outcome retained by the one public `prepare()` operation    |
 
 A transition trigger is not emitted and there is no lifecycle event bus. The
-controller creates a trigger from a method call or provider outcome, passes it
+loader creates a trigger from a method call or provider outcome, passes it
 to the pure function, and stores the returned `nextState`.
 
-The loader's live `state` and a preparation result's `status` are deliberately
-different. For example, a previously returned result remains
-`{ status: "ready", capability }` after the loader later moves to
-`state === "disposed"`; the result records what that call returned, while the
-loader state records what may happen now.
+The loader's live `state` describes progress before settlement. Once the
+attempt settles, its state and the retained result describe the same terminal
+outcome. Repeated `prepare()` calls do not construct new result objects.
 
 ### Transition triggers
 
-| Trigger                 | Meaning                                                         |
-| ----------------------- | --------------------------------------------------------------- |
-| `prepare-requested`     | Start from idle or join/reuse the current attempt or result     |
-| `retry-requested`       | Start again only from idle, unsupported, or failed              |
-| `preparation-succeeded` | The active attempt produced a callable capability               |
-| `support-unavailable`   | The active attempt proved a required platform feature absent    |
-| `preparation-failed`    | The active attempt failed unexpectedly                          |
-| `dispose-requested`     | Retire from any live state; disposed then absorbs late outcomes |
+| Trigger                 | Meaning                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| `prepare-requested`     | Start from idle or join/reuse the current attempt or result  |
+| `preparation-succeeded` | The active attempt produced a callable capability            |
+| `support-unavailable`   | The active attempt proved a required platform feature absent |
+| `preparation-failed`    | The active attempt failed unexpectedly                       |
 
-Each pure result has an `effect` of `state-changed`, `state-unchanged`, or
-`late-preparation`. Only `state-changed` represents a state entry. In
-particular, `ready + prepare-requested` and `ready + retry-requested` are
-`state-unchanged`; a preparation settlement arriving after disposal is
-`late-preparation` and cannot publish a capability.
+Each pure result has an `effect` of `state-changed` or `state-unchanged`. Only
+`state-changed` represents a state entry. In particular, a
+`prepare-requested` trigger in `preparing`, `ready`, `unsupported`, or `failed`
+is `state-unchanged` and reuses the retained Promise.
 
 `analyze()`, async analysis, and shared-frame `encode()` are deliberately not
 transition triggers. They require a ready capability but do not mutate loader
@@ -176,43 +265,72 @@ state.
 | `ready`       | The selected component is callable and no loading remains in its execution path |
 | `unsupported` | The environment lacks a required declared capability                            |
 | `failed`      | Preparation failed unexpectedly                                                 |
-| `disposed`    | Retired; callers stop using previously returned capabilities                    |
+
+## Variant-specific public capabilities
+
+The root `@millipede/inspector-component` entry exports shared types only.
+Runtime code imports exactly one selected subpath:
+
+| Package subpath       | Loader                            | Operation on `ready.capability`                          |
+| --------------------- | --------------------------------- | -------------------------------------------------------- |
+| `/analysis`           | `analysisComponentLoader`         | `analyzeTree(nodes, textureWidth, textureHeight)`        |
+| `/gpu-analysis`       | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |
+| `/gpu-analysis-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |
+| `/gpu-analysis-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |
+| `/diagnostics`        | `wasiAsyncProofsComponentLoader`  | Explicit WASI async proof calls                          |
+
+Stable and frame summary resolvers are invocation-local dependencies. They are
+never installed in module-global state.
+
+The async loader owns the exact `WebAssembly.Suspending` and
+`WebAssembly.promising` gate. It checks both before the provider dynamically
+imports or evaluates the generated async world; absence produces
+`unsupported`, while a generated-world import or instantiation error produces
+`failed`.
+
+The frame capability's `encode()` operation is synchronous. The frame world
+omits command-encoder `finish` and `gpu-queue`, and the component never finishes
+or submits the borrowed encoder. The browser scheduler alone performs those
+operations after `encode()` returns.
 
 ## Behavioral guarantees
 
 1. `prepare()` is explicit.
-2. Concurrent calls on one loader share the same active preparation attempt.
+2. All calls on one module-wide loader share the exact same active or settled
+   preparation Promise.
 3. Calling `prepare()` again after `ready` returns the existing ready result
-   and capability without creating a new attempt.
-4. An `unsupported` or `failed` result remains typed and stable until an
-   explicit retry or disposal.
-5. Disposal during preparation prevents a late result from being published;
-   any capability produced afterward is cleaned up by its owner.
+   and capability without creating a new attempt or state entry.
+4. An `unsupported` or `failed` result remains typed and stable for the
+   lifetime of that imported module.
+5. A fresh page or intentionally versioned module URL is the reset boundary;
+   the loader exposes no retry operation.
 6. `ready` means that component preparation has completely finished.
 7. `analyze()` and shared-frame `encode()` perform no component import,
-   download, compilation, instantiation, registration scan, or self-test.
+   download, compilation, instantiation, or self-test.
 8. Shared-frame encoding remains synchronous after preparation.
-9. `unsupported` is distinct from `failed`.
-10. A missing deployment artifact, broken import, or instantiation error is
+9. Any shared-frame `encode()` failure requires the scheduler to abandon the
+   complete encoder and frame; cleanup cannot roll back recorded commands.
+10. `unsupported` is distinct from `failed`.
+11. A missing deployment artifact, broken import, or instantiation error is
     `failed`, not `unsupported`.
-11. Failures are not silently converted into a permanently cached `null`.
-12. Retry, when supported, is explicit and creates a new preparation attempt.
-13. Disposal is idempotent from every state. Repeated calls after disposal
-    return the same completed result and repeat no destructive work.
-14. Importing a variant or diagnostic entrypoint performs no workload.
-15. The loader does not expose its private component provider to callers.
-16. Callers must stop using a capability after its loader is disposed. The
-    current provider cannot revoke an already escaped JavaScript function
-    reference, so this rule is an ownership contract rather than a claim of
-    runtime revocation.
-17. Callers quiesce active component invocations before disposal. This loader
-    retires preparation and provider ownership; it does not cancel an
-    `analyze()` or borrowed-frame `encode()` already in progress.
+12. Failures are not silently converted into a cached `null`.
+13. Importing a variant or diagnostic entrypoint performs no workload.
+14. The loader does not expose its private component provider to callers.
+15. The public loader exposes only `state` and `prepare()`; GPU and session
+    retirement remain the responsibility of their actual owners.
+16. `/diagnostics` isolates explicit WASI async proofs, not GPU summary
+    readback performed by analyzer capabilities.
+17. Before transfer, projection or validation failure independently attempts
+    destruction of every component-created renderer and summary buffer; one
+    cleanup failure does not prevent the remaining attempts.
+18. Temporary WIT identity cleanup never destroys caller-owned devices,
+    textures, reference buffers, or borrowed encoders. After transfer, the
+    browser result, resolver, or scheduler owns native cleanup.
 
-## Illustrative API shape
+## Public loader shape
 
-The final public spelling remains owned by R2-C and P2. The smallest meaningful
-behavioral shape is:
+Each exported loader uses the following implemented behavioral shape. Concrete
+capability operations are the variant-specific methods listed above:
 
 ```ts
 type PrepareResult<T> =
@@ -230,57 +348,39 @@ type PrepareResult<T> =
   | {
       status: "failed";
       error: Error;
-    }
-  | {
-      status: "disposed";
     };
 
 interface SelectedComponent<T> {
-  readonly state:
-    | "idle"
-    | "preparing"
-    | "ready"
-    | "unsupported"
-    | "failed"
-    | "disposed";
+  readonly state: "idle" | "preparing" | "ready" | "unsupported" | "failed";
   prepare(): Promise<PrepareResult<T>>;
-  retry(): Promise<PrepareResult<T>>;
-  dispose(): Promise<void>;
 }
 ```
 
-The private implementation boundary remains small while retaining an explicit
-provider-cleanup operation:
+The private implementation boundary prepares and returns the authored
+capability directly:
 
 ```ts
-interface PrivatePreparedComponent<T> {
-  capability: T;
-  dispose(): Promise<void>;
-}
-
-type InstantiateSelectedComponent<T> = () => Promise<
-  PrivatePreparedComponent<T>
->;
+type InstantiateSelectedComponent<T> = () => Promise<T>;
 ```
 
-The authored loader normalizes the returned exports into the selected
-capability and retains the private disposer for failure, late completion, and
-normal retirement. A provider with no explicit teardown implements a no-op
-disposer. Consumers never receive or identify the underlying provider.
+The authored provider normalizes generated exports before returning that
+capability. Consumers never receive or identify the underlying provider. No
+fake private disposer is modeled because the current provider cannot unload an
+evaluated ESM module or its component instance. Real GPU cleanup remains on
+the device-, session-, invocation-, output-, and pending-summary ownership
+paths where destructive work can actually occur.
 
-The current generated provider uses a no-op private disposer because evaluated
-ESM and its component instance cannot be unloaded through the generated API.
-Disposal still retires the authored loader and prevents late publication. A
-future provider may supply real instance cleanup without changing the public
-lifecycle.
+## Variant isolation
 
-## Target variant isolation
-
-P2 and C1 must make each production entrypoint represent one selected
-capability family. The current root entry keeps all authored variants
-build-reachable but dynamically prepares only the selected generated world.
-That is runtime preparation isolation, not final entrypoint or deployment
-isolation.
+Each local runtime subpath represents one selected capability family, and the
+root entry is type-only. Private generated-world imports are split across
+`component-loader/src/providers/*.ts`; no singular shared provider adapter
+makes every world reachable. Millipede performs consumer-side selection through
+three explicit lazy adapter modules in `surface-inspector-browser`; each imports
+only its exact component runtime subpath. No wrapper package or mutable backend
+registry makes all variants reachable. P2 still owns the final discovery
+topology, while C1/V1 owns proof that the deployed Millipede path preserves
+request isolation.
 
 The selected runtime path must satisfy:
 
@@ -299,13 +399,11 @@ Exact request counts are not architectural contracts. The invariant is
 selection isolation, not the internal file topology of a particular component
 provider.
 
-Build-time exclusion and runtime selection are different claims:
-
-| Claim                                            | Required proof                                      |
-| ------------------------------------------------ | --------------------------------------------------- |
-| Unselected variant is not requested at runtime   | Browser request inventory                           |
-| Unselected variant is absent from the deployment | Build graph and emitted-asset inspection            |
-| No hidden loading occurs during execution        | Network denial or request observation after `ready` |
+Future C1/V1 acceptance must load the final deployed consumer in Chromium and
+record the browser's actual requests. That evidence proves that the selected
+entry loads, no unselected or diagnostic world is requested, and no further
+component loading occurs during execution after `ready`. That browser evidence
+is the authoritative selection-isolation gate.
 
 ## Measurement boundary
 
@@ -328,7 +426,7 @@ created for:
 - component download;
 - component compilation;
 - component instantiation;
-- compatibility-provider internals;
+- private-provider internals;
 - browser-native component-engine internals.
 
 Instrumentation plumbing may have to exist before preparation to satisfy host
@@ -355,29 +453,30 @@ Self-tests are explicit diagnostics, not production bootstrap behavior.
 A diagnostic entrypoint must:
 
 1. be side-effect-free when imported;
-2. export an explicit operation such as `runSelfTest()`;
+2. require explicit preparation and an explicit proof operation;
 3. use the same prepared-capability boundary as production;
 4. report failure instead of swallowing it;
 5. never mark a production analyzer ready;
 6. remain absent from selected production bundles where C1 requires exclusion.
 
 A normal application activation must not automatically load or run the
-browser-safe analysis proof or the WASI async proof.
+browser-safe analysis proof or the WASI async proof. Millipede exposes its
+explicit bridge at `@millipede/surface-inspector-browser/diagnostics`; its
+ordinary selected-backend imports do not reference that bridge.
 
-## Current compatibility and future native support
+## Private provider replacement
 
-The current browser implementation still requires a compatibility provider.
-Today that provider is generated through JCO.
-
-That fact remains in build documentation, scripts, dependency metadata, and
-implementation-specific tests. It does not define this architectural contract.
+The current browser implementation uses a generated private provider. Its
+mechanics remain in build documentation, scripts, dependency metadata, and the
+[dedicated tooling document](../tooling/jco-generated-artifact-baseline.md).
+They do not define this architectural contract.
 
 A future conforming native browser implementation may replace the private
 provider:
 
 ```text
 Today:
-    private compatibility provider
+    private generated provider
         -> callable component capability
 
 Future:
@@ -385,15 +484,13 @@ Future:
         -> callable component capability
 ```
 
-Native adoption may change both the private provider and the package's artifact
-delivery because today's packaged browser-consumed payload does not ship the
-original component as its executable browser entry. R2-C's `D-ARTIFACT`
-decision and P2 own that packaging migration. Variant selection, the public
-capability contract, GPU execution, ownership rules, and post-ready
-measurements remain unchanged.
+Native adoption may change both the private provider and package artifact
+delivery. R2-C's `D-ARTIFACT` decision and P2 own that packaging migration.
+Variant selection, the public capability contract, GPU execution, ownership
+rules, and post-ready measurements remain unchanged.
 
-No provider registry or public JCO/native selector is required now. Native
-support should replace the compatibility implementation only after the required
+No provider registry or public generated/native selector is required now.
+Native support should replace the private implementation only after the required
 worlds, borrowed WebGPU resources, async behavior, and lifetime semantics are
 supported and pass the same capability tests.
 
@@ -404,23 +501,25 @@ supported and pass the same capability tests.
 | Side-effect-free import | Importing an entry performs no workload or self-test                     |
 | Explicit readiness      | `ready` is returned only after callable exports exist                    |
 | Single active attempt   | Concurrent preparation calls do not duplicate work                       |
+| Settled memoization     | Every later preparation call reuses the same Promise and result          |
 | Typed failure           | Unsupported capability and unexpected failure remain distinct            |
 | Hot-path purity         | No component loading occurs during `analyze()` or `encode()`             |
 | Shared-frame synchrony  | Encoding performs no import or await                                     |
-| Variant isolation       | P2/C1: only the selected variant appears in the runtime request graph    |
+| Frame failure ownership | A throwing `encode()` causes the scheduler to abandon the encoder/frame  |
+| Variant isolation       | C1/V1: Chromium requests only the selected deployed runtime variant      |
 | Measurement integrity   | No measurement event or clock read occurs before `ready`                 |
 | Explicit diagnostics    | Self-tests run only through an explicit diagnostic call                  |
 | Provider replaceability | Provider conformance tests depend only on normalized capability behavior |
-| Idempotent cleanup      | Repeated disposal does not repeat destructive effects                    |
 
-These tests must not assert the compatibility provider's internal module count,
-shim structure, or network-request count.
+These tests must not assert the private provider's internal module count or
+shim structure. Browser acceptance asserts selection and absence of post-ready
+loading, not a provider-specific total request count.
 
 ## Non-goals
 
 This contract does not specify or measure:
 
-- JCO core-module or shim topology;
+- private-provider module or shim topology;
 - browser-native Component Model lowering;
 - component download or compilation latency;
 - exact Wasm or JavaScript request counts;
@@ -428,15 +527,17 @@ This contract does not specify or measure:
 - generated-binding implementation details;
 - GPU pipeline, buffer, or bind-group reuse;
 - command encoding, batching, or submission policy;
-- final public package, world, factory, or method names;
 - the selected R2-C analyzer topology.
 
 ## Roadmap relationship
 
-- **H1** uses `ready` as the eligibility gate before lifetime observation.
+- **H1** remains pending and uses `ready` as the eligibility gate before
+  lifetime observation.
 - **R2-C** compares post-ready runtime, resource, and submission strategies.
-- **P2** implements the selected component adapters and loader topology.
-- **C1** proves production bundle and runtime-request isolation.
+- **P2** finalizes the selected discovery/session/resource topology in
+  Millipede; direct loader adoption is already implemented.
+- **C1/V1** remain pending and prove deployed runtime-request isolation in
+  Chromium end to end.
 - Native browser Component Model adoption is a later provider replacement, not
   a prerequisite for H1 or R2-C.
 

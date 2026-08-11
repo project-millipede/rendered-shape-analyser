@@ -1,9 +1,10 @@
 /**
- * Chrome/JSPI-only upstream WebGPU buffer readback helpers.
+ * JSPI-generated async-world WebGPU buffer readback helpers.
  *
  * Browser buffer mapping is promise-shaped, and upstream `webgpu.wit` models
- * `gpu-buffer.map-async` as an async function. These helpers therefore stay
- * out of the browser-safe stable component path.
+ * `gpu-buffer.map-async` as an async function. The stable generated world does
+ * not expose or invoke these methods, although the current canonical host
+ * module implements the combined stable, async, and frame method surface.
  */
 
 /** Minimal upstream `gpu-map-mode` shape used by the analyzer. */

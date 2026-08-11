@@ -40,7 +40,10 @@ INSPECTOR_COMPONENT_BUILD_DIR=/absolute/component-directory \
   npm run test:integration
 ```
 
-Node.js 24 or newer is required because the async generated worlds use JSPI.
+Node.js 24 or newer is required because the async generated worlds use the
+exact `WebAssembly.Suspending` and `WebAssembly.promising` JSPI APIs. The test
+runner enables Node's current JSPI flag; browser loaders perform their own
+pre-provider support gate.
 
 ## Test ownership
 
@@ -71,10 +74,21 @@ The analysis world and three GPU worlds exercise product boundaries. `wasi-0.3`
 is deliberately separate: it proves current WIT/JCO async projections without
 adding those proof exports to the product API.
 
+The public `/diagnostics` subpath selects only that isolated `wasi-0.3` proof.
+It does not absorb or replace GPU summary behavior. Stable integration still
+proves its readback plan, async integration still proves the Rust-decoded
+summary, and shared-frame integration still proves the pending-summary
+descriptor used after scheduler submission.
+
 JCO names, JSPI exports, base64 cutoff, and namespaced-export behavior mirror
 `scripts/sync.sh`. The mappings intentionally substitute the typed Node host
 for the browser host. Preparation resolves the locally installed TypeScript
 and JCO entrypoints directly and never invokes `npx`.
+
+Those are test-preparation parity requirements, not a second description of
+generated lowering. JCO provider and core-Wasm mechanics remain centralized in
+the
+[generated-artifact tooling baseline](../../docs/tooling/jco-generated-artifact-baseline.md).
 
 ## One host-module instance
 
@@ -107,6 +121,22 @@ execution and rendered output remain browser WebGPU test responsibilities.
 `Test` in helper names identifies the typed host implementation. It does not
 define a third test category; every runnable spec is either unit or integration.
 
+## Loader contract coverage
+
+`component-capability-state.test.ts` proves the pure
+`idle -> preparing -> ready | unsupported | failed` transition table.
+`component-capability-loader.test.ts` proves that the canonical loader factory
+has one shared preparation Promise and one settled result. Its only lifecycle
+operation is `prepare()`; the public shape deliberately has no `retry()` and no
+loader `dispose()`. Public-entry singleton identity and selected-world request
+isolation remain entry-level and real-browser acceptance responsibilities.
+
+`component-gpu-authored-capability.test.ts` keeps module preparation separate
+from ordinary invocation. It also proves the shared-frame rule: `encode()` is
+synchronous, and every throw requires the scheduler to abandon that
+encoder/frame without appending render work, finishing, or submitting. A native
+command stream cannot be rolled back after a partial encode.
+
 ## Validation strategy
 
 `gpu-validation.integration.test.ts` exercises one representative invalid call
@@ -120,6 +150,11 @@ validation reached the intended final truth-buffer branch:
 3. shared-frame must trap without beginning a pass or changing its borrowed
    encoder.
 
+That representative validation failure occurs before command recording and
+therefore proves an untouched encoder. It does not weaken the more general
+failure rule: if any later `encode()` step throws after appending commands, the
+scheduler abandons the whole frame and encoder.
+
 Rust unit tests own the pure metadata cases, their exact rule ordering, and
 metadata error strings. The representative resource failure remains at the
 generated boundary. Do not multiply the three component cases by every invalid
@@ -129,11 +164,21 @@ the pure validation arithmetic again.
 ## Shared analysis fixture
 
 `src/analysis/stats.rs::tests::fixture`,
-`tests/component-boundary/fixtures/analysis-tree.ts`, and Millipede's
-`packages/surface/inspector-wasm-host/src/self-test.ts` use the same six-node
-fixture. Its hand-computed expectations are six nodes, maximum depth three,
-two ghosts, total area 10,550, and coverage 0.425. A fixture change must update
-all three copies and their expectations together.
+`tests/component-boundary/fixtures/analysis-tree.ts`, and Millipede's explicit
+component-boundary diagnostic use the same six-node fixture. Its hand-computed
+expectations are six nodes, maximum depth three, two ghosts, total area 10,550,
+and coverage 0.425. A fixture change must update all three copies and their
+expectations together. Millipede exposes that diagnostic only through the
+explicit `@millipede/surface-inspector-browser/diagnostics` subpath; ordinary
+backend selection neither imports nor runs it.
+
+Millipede's browser package now also directly owns the three stable, async, and
+shared-frame device adapters. Each selected adapter lazily imports its exact
+component runtime subpath; there is no `surface-inspector-wasm` wrapper or
+mutable backend registry. This suite continues to prove the component and
+loader boundary itself. The still-pending H1 and C1/V1 browser evidence owns
+real lifetime and deployed request isolation, and Millipede's still-pending
+selection/session generation owns stale-result rejection and late cleanup.
 
 ## Canonical ownership
 

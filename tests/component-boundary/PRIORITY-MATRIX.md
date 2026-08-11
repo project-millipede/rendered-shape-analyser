@@ -71,26 +71,53 @@ code rather than additional test categories.
 |        9 | A WIT future projects to the expected Promise-like result.    |
 |        8 | A WIT byte stream projects to the expected semantic bytes.    |
 
+This `wasi-0.3` matrix is the complete meaning of the public `/diagnostics`
+subpath. The stable, async, and shared-frame summary assertions above remain
+part of their GPU analyzer contracts; `/diagnostics` neither owns nor replaces
+them.
+
 ## Unit tests
 
 ### `component-capability-state.test.ts`
 
-| Priority | Protected loader behavior                                                        |
-| -------: | -------------------------------------------------------------------------------- |
-|       10 | The pure preparation and retirement transition table remains explicit and legal. |
-|       10 | Ready is entered only by a successful active attempt and reused by normal calls. |
-|       10 | Retry starts only from idle, unsupported, or failed lifecycle outcomes.          |
-|       10 | Disposed absorbs repeated requests and every late preparation outcome.           |
+| Priority | Protected loader behavior                                                          |
+| -------: | ---------------------------------------------------------------------------------- |
+|       10 | The pure one-shot transition table enters ready exactly once.                      |
+|       10 | Active and settled states keep repeated `prepare-requested` transitions unchanged. |
+|       10 | Preparing maps only to ready, unsupported, or failed settlements.                  |
+|       10 | A settlement without an active preparation is rejected as an illegal transition.   |
 
 ### `component-capability-loader.test.ts`
 
-| Priority | Protected loader behavior                                                         |
-| -------: | --------------------------------------------------------------------------------- |
-|       10 | Concurrent preparation shares one provider attempt and one ready capability.      |
-|       10 | Unsupported and failed outcomes remain typed until an explicit retry.             |
-|       10 | Nullable compatibility loading follows the same current or retried attempt.       |
-|       10 | Disposal quarantines late completion and retires a ready provider exactly once.   |
-|        9 | Disposal is idempotent and private provider ownership never enters ready results. |
+| Priority | Protected loader behavior                                                                     |
+| -------: | --------------------------------------------------------------------------------------------- |
+|       10 | Concurrent and later `prepare()` calls share one Promise, provider attempt, and ready result. |
+|       10 | Unsupported settles without a provider call; later `prepare()` calls return that same result. |
+|       10 | Provider failure settles and reports exactly once without a second attempt.                   |
+|       10 | An unreadable rejection still settles as failed instead of stranding the loader in preparing. |
+|        9 | Failure reporting cannot replace the authoritative result and is reentrant-safe.              |
+|        9 | The loader exposes only read-only `state` and `prepare()`, with no retry or disposal method.  |
+
+### `component-gpu-authored-capability.test.ts`
+
+| Priority | Protected authored-capability behavior                                                     |
+| -------: | ------------------------------------------------------------------------------------------ |
+|       10 | Preparation occurs once while each stable call receives its own summary resolver.          |
+|       10 | Shared-frame invocation stays synchronous and preserves exact output identity.             |
+|       10 | Every shared-frame throw requires scheduler abandonment without append, finish, or submit. |
+|        9 | Observer events report primitive invocation boundaries without changing outcomes.          |
+|        9 | Disabled observation preserves the exact Promise, output, and rejection identities.        |
+|        9 | Unreadable thrown values cannot replace the original failure through observation.          |
+
+### `component-gpu-output-cleanup.test.ts`
+
+| Priority | Protected GPU ownership behavior                                                              |
+| -------: | --------------------------------------------------------------------------------------------- |
+|       10 | First renderer validation failure destroys all six outputs and both summary buffers.          |
+|       10 | Either partial summary lookup destroys its independently resolved native buffer exactly once. |
+|       10 | Summary unmap and both destruction attempts remain independent and best-effort.               |
+|       10 | Failed frame projection cleanup destroys every recorded output without finishing the encoder. |
+|        9 | Frame discard reports only native buffers whose destruction actually succeeded.               |
 
 ### `host-gpu-readback.test.ts`
 
@@ -117,11 +144,11 @@ code rather than additional test categories.
 3. Generated integration uses one final truth-buffer validation failure per
    public variant. Rust unit tests own pure metadata cases, their precedence,
    and metadata error strings.
-4. Capability state-machine tests are pure transition-table tests. Loader
-   controller tests separately use an injected provider to cover promises and
-   cleanup without generated output. A later real-browser smoke must exercise
-   the authored public loader, current provider adapter, and selected component
-   together.
+4. Capability state-machine tests are pure transition-table tests. Module-wide
+   loader tests separately inject support and instantiation operations to prove
+   its one-shot Promise and settled outcomes without generated output.
+5. A later real-browser smoke must exercise the authored public loader, current
+   provider adapter, and selected component together.
 
 ## Explicitly excluded
 

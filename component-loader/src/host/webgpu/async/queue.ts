@@ -1,8 +1,10 @@
 /**
- * Chrome/JSPI-only upstream WebGPU queue helpers.
+ * JSPI-generated async-world WebGPU queue helpers.
  *
  * Queue completion is promise-shaped in browser WebGPU and async-shaped in
- * upstream `webgpu.wit`, so this helper stays out of the stable path.
+ * upstream `webgpu.wit`. The stable generated world does not expose or invoke
+ * this method, although the current canonical host module implements the
+ * combined variant surface.
  */
 
 /**
