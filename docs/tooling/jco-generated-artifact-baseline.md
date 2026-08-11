@@ -1,6 +1,6 @@
 # JCO transpilation and generated Wasm artifact baseline
 
-> **Status:** Current implementation reference, recorded 2026-08-10
+> **Status:** Current implementation reference, recorded 2026-08-11
 >
 > **Scope:** Browser artifact generation, generated-file roles, and toolchain
 > provenance
@@ -25,18 +25,16 @@ For provider-neutral readiness and lifecycle behavior, see the
 | `wit-bindgen`           | 0.60.0                      | Guest bindings and Component Model metadata                                          |
 | `wasm-tools`            | 1.251.0                     | Component lifting and world verification                                             |
 | `wkg`                   | 0.15.1                      | WIT dependency fetch and validation                                                  |
-| `@bytecodealliance/jco` | 1.27.0 resolved             | CLI used to transpile existing components                                            |
-| `jco-transpile`         | 0.6.3 transitive            | Focused transpiler used by the JCO CLI                                               |
-| `js-component-bindgen`  | 2.2.2 embedded              | Binding generator vendored inside the resolved transpiler                            |
+| `@bytecodealliance/jco` | 1.28.1 resolved             | CLI used to transpile existing components                                            |
 | Node                    | 24.15.0                     | Generated-component test runtime, including JSPI support                             |
 | WIT package             | `millipede:inspector@0.1.0` | Versioned project interfaces                                                         |
 | WIT dependency          | `wasi:webgpu@0.0.1`         | Upstream GPU resource interface, currently supplied through the local `wkg` override |
 
-The lockfile pins the JCO CLI and its `jco-transpile` package. The embedded
-`js-component-bindgen` version is transpiler provenance rather than a separate
-lockfile entry. Keep `jco-transpile` transitive while repository scripts invoke
-the JCO CLI. Calling the focused transpiler API directly would be a separate
-build-architecture change requiring generated-artifact parity review.
+The lockfile pins the JCO CLI. JCO owns its internal transpilation and
+binding-generation stack; this repository neither selects nor invokes those
+lower-level implementation packages separately. Replacing the CLI with a
+lower-level generator API would be a separate build-architecture change
+requiring generated-artifact parity review.
 
 ## Build direction
 
@@ -217,9 +215,9 @@ Async tables also contain generated runtime machinery such as waitable polling
 and task/future/stream operations. Table entries must therefore be described as
 trampoline functions rather than exclusively as calls into the authored host.
 
-These names and counts record JCO 1.27.0 with `wit-component` 0.251.0. They are
-not stable contracts. Another generator version, provider, or native browser
-Component Model implementation may use a different representation.
+These names and counts record JCO 1.28.1. They are not stable contracts.
+Another generator version, provider, or native browser Component Model
+implementation may use a different representation.
 
 ## Transpile versus componentize
 
@@ -243,10 +241,9 @@ Componentization is useful for JavaScript-authored portable components. It is
 not part of this Rust guest's build; the TypeScript loader and WebGPU host stay
 outside the guest component.
 
-The `jco` CLI delegates transpilation to the focused
-`@bytecodealliance/jco-transpile` package. The repository installs the full JCO
-package because `scripts/sync.sh` and component-boundary preparation use that
-CLI. Directly adopting the focused API would need a separate design and exact
+The repository installs the full JCO package because `scripts/sync.sh` and
+component-boundary preparation use its CLI. Replacing that CLI with a
+lower-level generator API would need a separate design and exact
 artifact-parity proof.
 
 ## Validation ownership

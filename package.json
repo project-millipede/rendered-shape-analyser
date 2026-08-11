@@ -54,7 +54,7 @@
     "wit:fetch": "cargo run -p inspector-component-xtask -- wit fetch"
   },
   "devDependencies": {
-    "@bytecodealliance/jco": "^1.27.0",
+    "@bytecodealliance/jco": "^1.28.1",
     "@types/node": "26.1.2",
     "@webgpu/types": "^0.1.71",
     "tsup": "^8.5.1",
