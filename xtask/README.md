@@ -5,7 +5,7 @@ Rust task runner for repository-local maintenance commands.
 This crate owns WIT dependency orchestration because the policy is part of the
 Rust component contract:
 
-- `wit fetch` runs `wkg wit fetch` from `../wkg`, where the temporary
+- `wit fetch` runs `wkg fetch` from `../wkg`, where the temporary
   `wasi:webgpu` override lives.
 - `wit fetch` verifies that the fetched `wasi:webgpu@0.0.1` package exposes the
   async browser-relevant surface we expect.

@@ -17,5 +17,5 @@ When `wkg get wasi:webgpu@0.0.1 --format wit` succeeds without the override:
 
 `wkg` is currently used as a CLI because the published `wkg` crate is
 binary-only. The Rust `xtask` crate owns orchestration and policy checks; it
-calls `wkg wit fetch` from this folder so the local override is resolved
+calls `wkg fetch` from this folder so the local override is resolved
 correctly.

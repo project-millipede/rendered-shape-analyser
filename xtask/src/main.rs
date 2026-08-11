@@ -31,7 +31,7 @@ fn wit_fetch() -> Result<()> {
     let root = repo_root();
     let wkg_dir = root.join("wkg");
     let status = Command::new("wkg")
-        .args(["wit", "fetch", "--wit-dir", "../wit", "--type", "wit"])
+        .args(["fetch", "../wit", "--type", "wit"])
         .current_dir(&wkg_dir)
         .status()
         .with_context(|| {
@@ -42,7 +42,7 @@ fn wit_fetch() -> Result<()> {
         })?;
 
     if !status.success() {
-        bail!("wkg wit fetch failed with status {status}");
+        bail!("wkg fetch failed with status {status}");
     }
 
     verify_wasi_webgpu_async_wit(&root)?;

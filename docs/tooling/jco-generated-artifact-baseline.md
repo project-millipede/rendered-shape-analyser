@@ -24,7 +24,7 @@ For provider-neutral readiness and lifecycle behavior, see the
 | Rust                    | stable (1.96.0 recorded)    | `rust-toolchain.toml` selects the floating stable channel                            |
 | `wit-bindgen`           | 0.60.0                      | Guest bindings and Component Model metadata                                          |
 | `wasm-tools`            | 1.251.0                     | Component lifting and world verification                                             |
-| `wkg`                   | 0.15.1                      | WIT dependency fetch and validation                                                  |
+| `wkg`                   | 0.16.0                      | WIT dependency fetch and validation                                                  |
 | `@bytecodealliance/jco` | 1.28.1 resolved             | CLI used to transpile existing components                                            |
 | Node                    | 24.15.0                     | Generated-component test runtime, including JSPI support                             |
 | WIT package             | `millipede:inspector@0.1.0` | Versioned project interfaces                                                         |
