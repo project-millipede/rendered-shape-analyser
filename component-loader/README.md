@@ -115,10 +115,6 @@ For an authored TypeScript-only change after generated output already exists:
 pnpm run loader:build
 ```
 
-Authored TypeScript uses extensionless relative imports. Generated imports are
-centralized in `src/generated.ts`; the loader build also enforces the
-repository's explicit-boundary-type policy.
-
 Synchronous browser metadata (`GPUTexture.width`, `GPUTexture.height`, and
 `GPUBuffer.size`) stays under `src/host/webgpu/sync/`. Promise-shaped JSPI
 operations such as queue completion and error-scope resolution stay under
