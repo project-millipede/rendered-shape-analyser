@@ -72,13 +72,11 @@ export default defineConfig({
   dts: true,
   entry: {
     index: "component-loader/src/index.ts",
-    analysis: "component-loader/src/analysis.ts",
     "gpu-analysis": "component-loader/src/gpu-analysis.ts",
     "gpu-analysis-async": "component-loader/src/gpu-analysis-async.ts",
     "gpu-analysis-frame": "component-loader/src/gpu-analysis-frame.ts",
     "boundary-proofs/wasi-async":
       "component-loader/src/boundary-proofs/wasi-async/entry.ts",
-    "host/events": "component-loader/src/host/events.ts",
     "host/log": "component-loader/src/host/log.ts",
     "host/webgpu": "component-loader/src/host/webgpu/index.ts",
   },

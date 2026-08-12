@@ -13,15 +13,6 @@ code rather than additional test categories.
 
 ## Integration tests
 
-### `analysis.integration.test.ts`
-
-| Priority | Protected R2 behavior                                                         |
-| -------: | ----------------------------------------------------------------------------- |
-|       10 | Typed layout records cross WIT and return the exact hand-computed aggregates. |
-|        9 | Public ping preserves component identity, version, and caller input.          |
-|        8 | The plain JSON parameter string crosses without trapping.                     |
-|        7 | Existing guest log calls and the exact analysis event remain connected.       |
-
 ### `gpu-stable.integration.test.ts`
 
 | Priority | Protected R2 behavior                                                             |

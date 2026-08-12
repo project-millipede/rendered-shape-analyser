@@ -59,23 +59,23 @@ flowchart LR
 ```sh
 wasm-tools component new \
   target/wasm32-unknown-unknown/release/inspector_component.wasm \
-  -o target/component/inspector-component.analysis.wasm
+  -o target/component/inspector-component.gpu-analysis.wasm
 ```
 
 The resulting file under `target/component/` is already a WebAssembly
-Component. `scripts/sync.sh` then transpiles each of the five components into
+Component. `scripts/sync.sh` then transpiles each of the four components into
 one staging directory and replaces `pkg/generated/` only after every world
 succeeds:
 
 ```sh
 npx jco transpile \
-  target/component/inspector-component.analysis.wasm \
-  -o pkg/generated/analysis \
+  target/component/inspector-component.gpu-analysis.wasm \
+  -o pkg/generated/gpu-analysis \
   --name inspector-component \
   --map \
     'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map \
-    'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
+    'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
   --base64-cutoff 0 \
   --no-namespaced-exports
 ```
@@ -98,6 +98,11 @@ general WASI runtime, libc, or stderr surface. Required capabilities are
 declared explicitly through the selected WIT world; guest panic diagnostics
 use the project host-log import.
 
+The Rust crate has no default world. Every Cargo invocation and the build
+automation select exactly one of `gpu-analysis`, `gpu-analysis-async`,
+`gpu-analysis-frame`, or `wasi-async-proofs`. This keeps the stable product,
+experimental variants, and isolated proof harness equally explicit.
+
 `wkg/` owns dependency resolution, while `xtask` fetches and verifies the
 generated `wit/deps/` tree. The local `wasi:webgpu@0.0.1` override remains
 temporary until that package resolves from the configured public registry.
@@ -105,8 +110,7 @@ temporary until that package resolves from the configured public registry.
 The async GPU and WASI-proof worlds use JSPI. The proof transpile explicitly
 names `prove-future` and `prove-stream` as async exports so their generated
 writer tasks are driven correctly. That proof remains isolated from product
-worlds. In `analysis.wit`, `%flags` escapes the WIT keyword; generated
-TypeScript correctly exposes the ordinary property name `flags`.
+worlds.
 
 ## Generated files
 
@@ -194,7 +198,6 @@ table. There is no cross-variant union table:
 
 | Generated world              | Current forwarding-table slots |
 | ---------------------------- | -----------------------------: |
-| `analysis`                   |                              2 |
 | `gpu-analysis`               |                             12 |
 | `gpu-analysis-async`         |                             20 |
 | `gpu-analysis-frame`         |                              9 |
@@ -208,8 +211,8 @@ The exact routing belongs to the generator rather than the public WIT API.
 Current output routes many strings, lists, descriptors, results, and async
 lowering operations through the forwarding table. Other imports—including
 several scalar/resource-handle operations and resource drops—use direct
-generated trampolines. Guest functions such as `analyzeTree`, `analyze`, and
-`encode` are exports and never occupy import-table slots.
+generated trampolines. Guest functions such as `analyze` and `encode` are
+exports and never occupy import-table slots.
 
 Async tables also contain generated runtime machinery such as waitable polling
 and task/future/stream operations. Table entries must therefore be described as
@@ -248,7 +251,7 @@ artifact-parity proof.
 
 ## Validation ownership
 
-`tests/component-boundary/` transpiles the same five built Component Model
+`tests/component-boundary/` transpiles the same four built Component Model
 artifacts into `target/component-tests/generated/`, substituting the typed Node
 host for the browser host. Those integration tests validate real generated
 bindings and guest/host calls. Unit tests verify the stateful test host and

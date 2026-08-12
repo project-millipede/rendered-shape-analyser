@@ -39,15 +39,15 @@ The local loader implements the provider-neutral lifecycle, direct authored
 capabilities, and per-world entry isolation. Millipede now adopts that contract
 through browser-owned lazy, selected-variant adapters.
 
-| Implemented local contract                                                                              | Implemented Millipede adoption                                                                                      |
-| ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| The root package entry exports types only                                                               | `surface-inspector-browser` owns three explicit device-local adapter modules                                        |
-| `/analysis`, `/gpu-analysis`, `/gpu-analysis-async`, and `/gpu-analysis-frame` isolate runtime families | Selecting a backend dynamically imports only its exact stable, async, or shared-frame adapter                       |
-| A private adapter colocated with its capability adapts each generated world                             | Each adapter imports the matching component subpath and calls that loader's one-shot `prepare()`                    |
-| Typed loaders return `ready`, `unsupported`, or `failed`                                                | Device-generation preparation preserves those outcomes and retires ready adapters independently                     |
-| `/boundary-proofs/wasi-async` is a side-effect-free proof entry separate from analyzer entries          | The explicit browser `/boundary-proofs` export remains outside ordinary backend selection                           |
-| `ready` provides the post-preparation measurement boundary                                              | Invocation and measurement eligibility begins only after selected preparation reports `ready`                       |
-| Stable and frame summary resolvers are invocation-local options                                         | Each call passes its device adapter's resolver; no module-global resolver or mutable backend registry is configured |
+| Implemented local contract                                                                     | Implemented Millipede adoption                                                                                      |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| The root package entry exports types only                                                      | `surface-inspector-browser` owns three explicit device-local adapter modules                                        |
+| `/gpu-analysis`, `/gpu-analysis-async`, and `/gpu-analysis-frame` isolate runtime families     | Selecting a backend dynamically imports only its exact stable, async, or shared-frame adapter                       |
+| A private adapter colocated with its capability adapts each generated world                    | Each adapter imports the matching component subpath and calls that loader's one-shot `prepare()`                    |
+| Typed loaders return `ready`, `unsupported`, or `failed`                                       | Device-generation preparation preserves those outcomes and retires ready adapters independently                     |
+| `/boundary-proofs/wasi-async` is a side-effect-free proof entry separate from analyzer entries | The explicit browser `/boundary-proofs` export remains outside ordinary backend selection                           |
+| `ready` provides the post-preparation measurement boundary                                     | Invocation and measurement eligibility begins only after selected preparation reports `ready`                       |
+| Stable and frame summary resolvers are invocation-local options                                | Each call passes its device adapter's resolver; no module-global resolver or mutable backend registry is configured |
 
 This completes direct consumer-loader adoption. It does not select the final
 discovery/session/resource topology: R2-C and P2 still own that decision.
@@ -274,7 +274,6 @@ Runtime code imports exactly one selected subpath:
 
 | Package subpath               | Loader                            | Operation on `ready.capability`                          |
 | ----------------------------- | --------------------------------- | -------------------------------------------------------- |
-| `/analysis`                   | `analysisComponentLoader`         | `analyzeTree(nodes, textureWidth, textureHeight)`        |
 | `/gpu-analysis`               | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |
 | `/gpu-analysis-async`         | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |
 | `/gpu-analysis-frame`         | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |

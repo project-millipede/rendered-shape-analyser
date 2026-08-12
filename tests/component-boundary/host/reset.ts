@@ -1,4 +1,3 @@
-import { resetTestEvents } from "./events.js";
 import { resetTestGpuResolverState } from "./gpu.js";
 import { resetTestLog } from "./log.js";
 import { resetTestWebGpuState } from "./webgpu/index.js";
@@ -12,7 +11,6 @@ import { resetTestWebGpuState } from "./webgpu/index.js";
  * after calling this function and must not reset during an active JSPI call.
  */
 export function resetTestHostState(): void {
-  resetTestEvents();
   resetTestLog();
   resetTestGpuResolverState();
   resetTestWebGpuState();

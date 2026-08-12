@@ -3,7 +3,6 @@
 > - **Status:** Accepted architectural requirement
 > - **Last reviewed:** 2026-08-08
 > - **Applies to:** Every GPU analyser backend and generated shader artifact
-> - **Does not apply to:** The browser-safe, CPU-only tree-aggregate component
 
 ## Purpose
 

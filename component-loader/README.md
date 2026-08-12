@@ -17,18 +17,14 @@ The package root is type-only. Import runtime values from exactly one selected
 subpath:
 
 ```ts
-import { analysisComponentLoader } from "@millipede/inspector-component/analysis";
+import { componentGpuAnalyzerLoader } from "@millipede/inspector-component/gpu-analysis";
 
-const prepared = await analysisComponentLoader.prepare();
+const prepared = await componentGpuAnalyzerLoader.prepare();
 if (prepared.status !== "ready") {
-  throw new Error(`analysis component is ${prepared.status}`);
+  throw new Error(`GPU analysis component is ${prepared.status}`);
 }
 
-const stats = prepared.capability.analyzeTree(
-  nodes,
-  textureWidth,
-  textureHeight,
-);
+const output = await prepared.capability.analyze(input, { summaryResolver });
 ```
 
 A selected subpath owns one module-wide loader. Its only lifecycle operation is
@@ -55,10 +51,9 @@ flowchart TD
   E -- "caller-owned WebGPU resources" --> C
 ```
 
-C0 established the non-GPU Component Model boundary. The browser package's P0
-WebGPU implementation remains the oracle and fallback. P1 adds the
-component-backed GPU modes below without moving backend selection or frame
-ownership into this loader.
+The browser package's P0 WebGPU implementation remains the oracle and fallback.
+P1 adds the component-backed GPU modes below without moving backend selection
+or frame ownership into this loader.
 
 ## Millipede adoption
 
@@ -92,7 +87,6 @@ pending, and P2 still owns the final discovery/session/resource topology.
 
 | Package subpath / Millipede mode              | Loader                            | Ready-capability operation                               | Requirement         |
 | --------------------------------------------- | --------------------------------- | -------------------------------------------------------- | ------------------- |
-| `/analysis`                                   | `analysisComponentLoader`         | `analyzeTree(nodes, width, height)`                      | Browser WebAssembly |
 | `/gpu-analysis` / `component-gpu`             | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         | WebGPU; no JSPI     |
 | `/gpu-analysis-frame` / `component-gpu-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` | WebGPU; no JSPI     |
 | `/gpu-analysis-async` / `component-gpu-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          | WebGPU plus JSPI    |
@@ -243,7 +237,6 @@ because one consumer is the async backend.
 | Source                                  | Responsibility                                                                     |
 | --------------------------------------- | ---------------------------------------------------------------------------------- |
 | `src/index.ts`                          | Shared type-only package root                                                      |
-| `src/analysis.ts`                       | Non-GPU authored capability and `analysisComponentLoader`                          |
 | `src/gpu-analysis.ts`                   | Stable authored capability and `componentGpuAnalyzerLoader`                        |
 | `src/gpu-analysis-async.ts`             | Async authored capability and `componentGpuAnalyzerAsyncLoader`                    |
 | `src/gpu-analysis-frame.ts`             | Synchronous borrowed-frame capability and `componentGpuFrameAnalyzerLoader`        |
@@ -265,7 +258,7 @@ because one consumer is the async backend.
 | `src/host/gpu-summary-stable.ts`        | Stable-world compact-summary ownership transfer                                    |
 | `src/host/gpu-summary-frame.ts`         | Shared-frame pending-summary lifecycle                                             |
 | `src/host/webgpu/`                      | Browser implementation and temporary registry for imported `wasi:webgpu` resources |
-| `src/host/log.ts`, `src/host/events.ts` | Guest logging and event imports                                                    |
+| `src/host/log.ts`                       | Guest logging import                                                               |
 
 For deeper contracts, see the [project README](../README.md), the
 [component-boundary test guide](../tests/component-boundary/README.md), and the

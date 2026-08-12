@@ -6,20 +6,11 @@
  * component code, host resources, and test observations inside Vitest's single
  * inlined module graph.
  */
-import type { LayoutNodeFixture } from "../fixtures/analysis-tree.js";
 import type {
   AnalysisPlan,
   AnalysisRequest,
 } from "../fixtures/gpu-workload.js";
 import type { SummaryReadbackDescriptor } from "../../../target/component-tests/host/gpu.js";
-
-interface TreeAggregates {
-  nodeCount: number;
-  maxDepth: number;
-  ghostCount: number;
-  totalArea: number;
-  coverage: number;
-}
 
 interface GpuLaneOutput {
   buffer: object;
@@ -59,20 +50,6 @@ export interface FrameGpuDispatch {
   visual: GpuLaneOutput;
   borderTrace: GpuLaneOutput;
   edgeDiscovery: GpuLaneOutput;
-}
-
-export interface AnalysisModuleExports {
-  ping(message: string): string;
-  setParams(paramsJson: string): void;
-  analyzeTree(
-    nodes: LayoutNodeFixture[],
-    textureWidth: number,
-    textureHeight: number,
-  ): TreeAggregates;
-}
-
-interface AnalysisModule {
-  analysis: AnalysisModuleExports;
 }
 
 export interface StableGpuModuleExports {
@@ -126,7 +103,6 @@ interface WasiAsyncBoundaryProofModule {
 }
 
 type GeneratedWorld =
-  | "analysis"
   | "gpu-analysis"
   | "gpu-analysis-async"
   | "gpu-analysis-frame"
@@ -140,9 +116,6 @@ const generatedModuleUrl = (world: GeneratedWorld): string =>
 
 const importGeneratedWorld = async <T>(world: GeneratedWorld): Promise<T> =>
   (await import(/* @vite-ignore */ generatedModuleUrl(world))) as T;
-
-export const loadAnalysisModule = (): Promise<AnalysisModule> =>
-  importGeneratedWorld<AnalysisModule>("analysis");
 
 export const loadStableGpuModule = (): Promise<StableGpuModule> =>
   importGeneratedWorld<StableGpuModule>("gpu-analysis");

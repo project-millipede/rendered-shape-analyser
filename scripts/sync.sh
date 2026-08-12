@@ -13,7 +13,6 @@ cd "$(dirname "$0")/.."
 COMPONENT_BUILD_DIR="${INSPECTOR_COMPONENT_BUILD_DIR:-$PWD/target/component}"
 GENERATED_DIR="${INSPECTOR_COMPONENT_GENERATED_DIR:-$PWD/pkg/generated}"
 GENERATED_DIR="$(node -p 'require("node:path").resolve(process.argv[1])' "$GENERATED_DIR")"
-ANALYSIS_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm"
 GPU_ANALYSIS_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis.wasm"
 GPU_ANALYSIS_ASYNC_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-async.wasm"
 GPU_ANALYSIS_FRAME_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm"
@@ -29,7 +28,7 @@ if [ ! -f "$PWD/package.json" ]; then
   exit 1
 fi
 
-if [ ! -f "$ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_ASYNC_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_FRAME_COMPONENT" ] || [ ! -f "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT" ]; then
+if [ ! -f "$GPU_ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_ASYNC_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_FRAME_COMPONENT" ] || [ ! -f "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT" ]; then
   echo "error: component artifacts missing; run npm run build first" >&2
   exit 1
 fi
@@ -40,21 +39,12 @@ STAGING_ROOT="$(mktemp -d)"
 trap 'rm -rf "$STAGING_ROOT"' EXIT
 
 STAGING_GENERATED_DIR="$STAGING_ROOT/generated"
-ANALYSIS_STAGING_DIR="$STAGING_GENERATED_DIR/analysis"
 GPU_ANALYSIS_STAGING_DIR="$STAGING_GENERATED_DIR/gpu-analysis"
 GPU_ANALYSIS_ASYNC_STAGING_DIR="$STAGING_GENERATED_DIR/gpu-analysis-async"
 GPU_ANALYSIS_FRAME_STAGING_DIR="$STAGING_GENERATED_DIR/gpu-analysis-frame"
 WASI_ASYNC_BOUNDARY_PROOF_STAGING_DIR="$STAGING_GENERATED_DIR/boundary-proofs/wasi-async"
 
-mkdir -p "$ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_ASYNC_STAGING_DIR" "$GPU_ANALYSIS_FRAME_STAGING_DIR" "$WASI_ASYNC_BOUNDARY_PROOF_STAGING_DIR"
-
-npx jco transpile "$ANALYSIS_COMPONENT" \
-  -o "$ANALYSIS_STAGING_DIR" \
-  --name inspector-component \
-  --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
-  --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
-  --base64-cutoff 0 \
-  --no-namespaced-exports
+mkdir -p "$GPU_ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_ASYNC_STAGING_DIR" "$GPU_ANALYSIS_FRAME_STAGING_DIR" "$WASI_ASYNC_BOUNDARY_PROOF_STAGING_DIR"
 
 # `millipede:inspector/host-gpu` currently contributes records and resource
 # types only, so JCO emits declarations for it but no runtime host import.
@@ -62,7 +52,6 @@ npx jco transpile "$GPU_ANALYSIS_COMPONENT" \
   -o "$GPU_ANALYSIS_STAGING_DIR" \
   --name inspector-component \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
-  --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
   --base64-cutoff 0 \
   --no-namespaced-exports
@@ -71,7 +60,6 @@ npx jco transpile "$GPU_ANALYSIS_ASYNC_COMPONENT" \
   -o "$GPU_ANALYSIS_ASYNC_STAGING_DIR" \
   --name inspector-component \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
-  --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
   --async-mode jspi \
   --async-exports 'millipede:inspector/gpu-analysis-async@0.1.0#analyze' \
@@ -82,7 +70,6 @@ npx jco transpile "$GPU_ANALYSIS_FRAME_COMPONENT" \
   -o "$GPU_ANALYSIS_FRAME_STAGING_DIR" \
   --name inspector-component \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
-  --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
   --base64-cutoff 0 \
   --no-namespaced-exports

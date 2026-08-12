@@ -1,11 +1,8 @@
-import {
-  ANALYSIS_TEXTURE_HEIGHT,
-  ANALYSIS_TEXTURE_WIDTH,
-  FIXTURE_NODES,
-} from "./analysis-tree.js";
-
 export const SUMMARY_BYTE_LENGTH = 72;
 export const COMPONENT_REFERENCE_BUFFER_SIZE = 16 + 16 * 32;
+export const ANALYSIS_TEXTURE_WIDTH = 200;
+export const ANALYSIS_TEXTURE_HEIGHT = 100;
+export const ANALYSIS_NODE_COUNT = 6;
 
 export interface AnalysisRequest {
   entryId: string;
@@ -37,7 +34,7 @@ export const createAnalysisRequest = (
   displayName,
   textureWidth: ANALYSIS_TEXTURE_WIDTH,
   textureHeight: ANALYSIS_TEXTURE_HEIGHT,
-  nodeCount: FIXTURE_NODES.length,
+  nodeCount: ANALYSIS_NODE_COUNT,
 });
 
 export const STABLE_ANALYSIS_REQUEST = createAnalysisRequest(
@@ -81,8 +78,8 @@ export const EXPECTED_FRAME_GPU_PLAN: AnalysisPlan = {
 export const EXPECTED_ASYNC_SUMMARY = {
   textureWidth: ANALYSIS_TEXTURE_WIDTH,
   textureHeight: ANALYSIS_TEXTURE_HEIGHT,
-  nodeCount: FIXTURE_NODES.length,
-  nodes: FIXTURE_NODES.map((_, nodeIndex) => ({
+  nodeCount: ANALYSIS_NODE_COUNT,
+  nodes: Array.from({ length: ANALYSIS_NODE_COUNT }, (_, nodeIndex) => ({
     nodeIndex,
     texelCount: 0,
     inkCount: 0,
@@ -95,6 +92,6 @@ export const EXPECTED_STABLE_HOST_RESULT = {
   entryId: STABLE_ANALYSIS_REQUEST.entryId,
   textureWidth: ANALYSIS_TEXTURE_WIDTH,
   textureHeight: ANALYSIS_TEXTURE_HEIGHT,
-  nodeCount: FIXTURE_NODES.length,
+  nodeCount: ANALYSIS_NODE_COUNT,
   nodes: [],
 };

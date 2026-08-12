@@ -1,8 +1,6 @@
 /// millipede:inspector — the Component Model boundary between the
-/// website host (millipede-docs, @demonstrators-social/wasm-component-host)
-/// and this Rust guest. Iteration one (C0) is deliberately GPU-free: it
-/// proves typed, documented, bidirectional communication. P1 uses upstream
-/// `wasi:webgpu` resource names through a project-owned analyzer workflow
-/// shim — never add DOM, React, CSS, html-in-canvas, or copied pixel types
-/// here.
+/// website host and this Rust guest. Product worlds use upstream `wasi:webgpu`
+/// resource names through a project-owned analyzer workflow shim; the isolated
+/// WASI async world proves JSPI projections. Never add DOM, React, CSS,
+/// html-in-canvas, or copied pixel types here.
 package millipede:inspector@0.1.0;

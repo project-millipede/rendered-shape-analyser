@@ -4,7 +4,7 @@ This suite is the canonical executable component-boundary proof for the R2
 migration. It has exactly two runnable categories:
 
 1. **Unit tests** exercise the typed test host without loading a component.
-2. **Integration tests** load the five real JCO-transpiled components against
+2. **Integration tests** load the four real JCO-transpiled components against
    that compiled host.
 
 The integration category proves the generated Component Model boundary in both
@@ -31,7 +31,7 @@ npm run test:integration
 npm run test:all
 ```
 
-Integration and combined runs require the five component artifacts under
+Integration and combined runs require the four component artifacts under
 `target/component/`. Run `npm run build` first when they are absent. An
 alternate artifact directory can be selected explicitly:
 
@@ -52,25 +52,24 @@ tests/component-boundary/
 ├── integration/        generated-component boundary tests
 ├── unit/               typed test-host behavior
 ├── assertions/         shared domain assertions
-├── fixtures/           shared component-boundary request and tree fixtures
+├── fixtures/           shared component-boundary GPU workload fixtures
 ├── host/               typed stateful Component Model test host
 ├── support/            Vitest setup and test-context helpers
 └── scripts/            deterministic host compilation and JCO preparation
 ```
 
 The preparation step clears only `target/component-tests/`, compiles the typed
-host into `target/component-tests/host/`, and transpiles the five worlds into
+host into `target/component-tests/host/`, and transpiles the four worlds into
 `target/component-tests/generated/`. The repository already ignores `target/`.
 
 | Generated world              | Component artifact                                    |
 | ---------------------------- | ----------------------------------------------------- |
-| `analysis`                   | `inspector-component.analysis.wasm`                   |
 | `gpu-analysis`               | `inspector-component.gpu-analysis.wasm`               |
 | `gpu-analysis-async`         | `inspector-component.gpu-analysis-async.wasm`         |
 | `gpu-analysis-frame`         | `inspector-component.gpu-analysis-frame.wasm`         |
 | `boundary-proofs/wasi-async` | `boundary-proofs/wasi-async/inspector-component.wasm` |
 
-The analysis world and three GPU worlds exercise product boundaries. The
+The three GPU worlds exercise product boundaries. The
 `boundary-proofs/wasi-async` world is deliberately separate: it proves current
 WIT/JCO async projections without adding those proof exports to the product
 API.
@@ -162,16 +161,11 @@ generated boundary. Do not multiply the three component cases by every invalid
 field; they prove each adapter's distinct failure and lifecycle behavior, not
 the pure validation arithmetic again.
 
-## Shared analysis fixture
+## Shared GPU fixture
 
-`src/analysis/stats.rs::tests::fixture`,
-`tests/component-boundary/fixtures/analysis-tree.ts`, and Millipede's explicit
-component-boundary proof use the same six-node fixture. Its hand-computed
-expectations are six nodes, maximum depth three, two ghosts, total area 10,550,
-and coverage 0.425. A fixture change must update all three copies and their
-expectations together. Millipede exposes that proof only through the explicit
-`@millipede/surface-inspector-browser/boundary-proofs` subpath; ordinary
-backend selection neither imports nor runs it.
+`tests/component-boundary/fixtures/gpu-workload.ts` supplies the common
+200 × 100 texture dimensions, six-record request count, and expected GPU
+plans used by the three product worlds.
 
 Millipede's browser package now also directly owns the three stable, async, and
 shared-frame device adapters. Each selected adapter lazily imports its exact

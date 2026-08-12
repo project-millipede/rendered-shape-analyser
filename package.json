@@ -14,10 +14,6 @@
       "types": "./component-loader/dist/index.d.ts",
       "default": "./component-loader/dist/index.js"
     },
-    "./analysis": {
-      "types": "./component-loader/dist/analysis.d.ts",
-      "default": "./component-loader/dist/analysis.js"
-    },
     "./gpu-analysis": {
       "types": "./component-loader/dist/gpu-analysis.d.ts",
       "default": "./component-loader/dist/gpu-analysis.js"

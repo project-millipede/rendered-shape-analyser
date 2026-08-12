@@ -12,10 +12,9 @@ remain unchanged:
 - Local npm package: `@millipede/inspector-component`
 - WIT package: `millipede:inspector`
 
-C0 established the non-GPU Component Model boundary. Millipede's P0 WebGPU
-implementation remains the oracle and fallback. P1 adds the component-backed
-GPU execution modes described below. These migration labels remain useful
-project history and do not replace the public API names.
+Millipede's P0 WebGPU implementation remains the oracle and fallback. P1 adds
+the component-backed GPU execution modes described below. These migration
+labels remain useful project history and do not replace the public API names.
 
 ## Use it
 
@@ -24,24 +23,20 @@ package entry exports shared TypeScript types only, so importing it never makes
 an execution variant reachable.
 
 ```ts
-import { analysisComponentLoader } from "@millipede/inspector-component/analysis";
+import { componentGpuAnalyzerLoader } from "@millipede/inspector-component/gpu-analysis";
 
-const prepared = await analysisComponentLoader.prepare();
+const prepared = await componentGpuAnalyzerLoader.prepare();
 if (prepared.status !== "ready") {
-  throw new Error(`analysis component is ${prepared.status}`);
+  throw new Error(`GPU analysis component is ${prepared.status}`);
 }
 
-const stats = prepared.capability.analyzeTree(
-  nodes,
-  textureWidth,
-  textureHeight,
-);
+const output = await prepared.capability.analyze(input, { summaryResolver });
 ```
 
 Preparation is explicit and shared by concurrent callers. A `ready` result
-means later `analyzeTree()`, GPU `analyze()`, or frame `encode()` calls perform
-no component loading. Unsupported environments and unexpected failures are
-different typed outcomes.
+means later GPU `analyze()`, frame `encode()`, or explicit boundary-proof calls
+perform no component loading. Unsupported environments and unexpected failures
+are different typed outcomes.
 
 Each runtime subpath owns one module-wide, one-shot loader. Its only lifecycle
 operation is `prepare()`: concurrent and later calls return the same Promise
@@ -77,7 +72,6 @@ final discovery/session/resource topology.
 
 | Capability subpath / Millipede mode           | Purpose                                                    | Runtime requirement | Execution / command ownership           |
 | --------------------------------------------- | ---------------------------------------------------------- | ------------------- | --------------------------------------- |
-| `/analysis`                                   | C0 typed, non-GPU analysis boundary                        | Browser Wasm        | Synchronous; no GPU commands            |
 | `/gpu-analysis` / `component-gpu`             | Stable P1 GPU analysis                                     | WebGPU              | Component finishes and submits          |
 | `/gpu-analysis-frame` / `component-gpu-frame` | P1 analysis inside a scheduler-owned frame                 | WebGPU              | Scheduler alone finishes and submits    |
 | `/gpu-analysis-async` / `component-gpu-async` | Experimental P1 async summary/readback path                | WebGPU + JSPI       | Component submits and awaits completion |
@@ -181,7 +175,6 @@ under `packages/surface/inspector-browser/docs/`, including
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `wit/`                                                                                               | Source-of-truth component interfaces                                   |
 | `wkg/`, `xtask/`, `wit/deps/`                                                                        | WIT dependency policy and generated dependencies                       |
-| `src/analysis/`                                                                                      | Non-GPU analysis and aggregate math                                    |
 | `src/boundary_proofs/wasi_async/`                                                                    | Isolated WASI async boundary-proof implementation                      |
 | `src/edge_discovery/`                                                                                | Pixel-derived discovery planning, shaders, resources, and recording    |
 | `src/reference_diagnostics/`                                                                         | Reference-guided statistics and visual diagnostics                     |
@@ -217,8 +210,8 @@ pnpm run test:unit          # host and loader unit tests
 pnpm run test:integration   # generated-component boundary tests
 pnpm test                   # typecheck and run the complete TypeScript suite
 pnpm run sync               # regenerate browser payloads and rebuild the loader
-cargo test                  # Rust unit and integration tests
-cargo doc --no-deps         # warning-free crate documentation
+cargo test --no-default-features --features gpu-analysis          # stable-world Rust tests
+cargo doc --no-default-features --features gpu-analysis --no-deps # stable-world crate documentation
 ```
 
 The complete release flow is:

@@ -2,7 +2,7 @@
 name = "inspector-component"
 version = "0.1.0"
 edition = "2024"
-description = "GPU-free Component Model boundary (C0) for the millipede webgpu-inspector"
+description = "WebGPU Component Model analyzer and isolated boundary proofs for millipede"
 license = "MIT"
 publish = false
 

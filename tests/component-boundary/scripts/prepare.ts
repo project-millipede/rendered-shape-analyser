@@ -47,27 +47,17 @@ if (unexpectedArguments.length > 0) {
  * maps them to the compiled Node host; `scripts/sync.sh` maps the same WIT
  * imports to browser host modules for website artifacts.
  */
-const commonMappings = [
-  ["millipede:inspector/host-log@0.1.0", "../../host/log.js"],
-  ["millipede:inspector/host-events@0.1.0", "../../host/events.js"],
-] as const;
-
 const wasiAsyncBoundaryProofMappings = [
   ["millipede:inspector/host-log@0.1.0", "../../../host/log.js"],
 ] as const;
 
 const gpuMappings = [
-  ...commonMappings,
+  ["millipede:inspector/host-log@0.1.0", "../../host/log.js"],
   ["wasi:webgpu/webgpu@0.0.1", "../../host/webgpu/index.js"],
   ["millipede:inspector/host-gpu@0.1.0", "../../host/gpu.js"],
 ] as const;
 
 const componentTranspiles: readonly ComponentTranspile[] = [
-  {
-    artifact: "inspector-component.analysis.wasm",
-    directory: "analysis",
-    mappings: commonMappings,
-  },
   {
     artifact: "inspector-component.gpu-analysis.wasm",
     directory: "gpu-analysis",
@@ -167,7 +157,6 @@ async function compileHost(typescript: string) {
   ]);
 
   for (const relativeOutput of [
-    "events.js",
     "gpu.js",
     "log.js",
     "reset.js",
@@ -187,7 +176,7 @@ async function compileHost(typescript: string) {
  * a partial component build cannot leave a misleading integration-test tree.
  *
  * @param jco - Resolved path to the locally installed JCO CLI.
- * @param componentRoot - Directory containing the five source components.
+ * @param componentRoot - Directory containing the four source components.
  */
 async function transpileComponents(jco: string, componentRoot: string) {
   // Reject an incomplete source build before creating any generated world.

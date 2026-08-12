@@ -73,7 +73,7 @@ real objects. It must remain dormant until the selected component is callable:
 no measurement capture, events, counters, clock reads, or run identifiers are
 permitted before the `ready` boundary.
 
-## Keep non-GPU and WebGPU entrypoints separate
+## Keep boundary proofs and WebGPU entrypoints separate
 
 The package exports several independent component worlds. They are not one
 generic “component call,” and their prerequisites must not bleed into each
@@ -81,21 +81,16 @@ other.
 
 | World                        | Package subpath               | Loader                            | Ready-capability operation                               | WebGPU | JSPI | Browser-lifetime role                 |
 | ---------------------------- | ----------------------------- | --------------------------------- | -------------------------------------------------------- | -----: | ---: | ------------------------------------- |
-| `analysis`                   | `/analysis`                   | `analysisComponentLoader`         | `analyzeTree(...)`                                       |     No |   No | Optional separate tree boundary proof |
 | `gpu-analysis`               | `/gpu-analysis`               | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |    Yes |   No | Initial stable lifetime path          |
 | `gpu-analysis-frame`         | `/gpu-analysis-frame`         | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |    Yes |   No | Scheduler-owned encoder path          |
 | `gpu-analysis-async`         | `/gpu-analysis-async`         | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |    Yes |  Yes | Conditional asynchronous path         |
 | `boundary-proofs/wasi-async` | `/boundary-proofs/wasi-async` | `wasiAsyncProofsComponentLoader`  | Explicit proof operation                                 |     No |  Yes | Outside GPU-lifetime scope            |
 
-The separate tree boundary proof must not request an adapter or
-construct the GPU fixture. It loads a different component artifact and should
-normally be skipped by the GPU-lifetime path. Its success is not evidence that
-the selected GPU component is ready or that any WebGPU resource-lifetime
-property holds. The isolated WASI async proof can confirm a JSPI projection
-but cannot establish GPU ownership or destruction. The
-`/boundary-proofs/wasi-async` split isolates those WASI proofs; it does not
-separate GPU-to-CPU summary readback from the stable, async, or frame analyzer
-capabilities. Millipede reaches this proof only through the explicit
+The isolated WASI async proof can confirm a JSPI projection but cannot
+establish GPU ownership or destruction. The `/boundary-proofs/wasi-async`
+split isolates those WASI proofs; it does not separate GPU-to-CPU summary
+readback from the stable, async, or frame analyzer capabilities. Millipede
+reaches this proof only through the explicit
 `@millipede/surface-inspector-browser/boundary-proofs` entry; ordinary backend
 selection does not import it.
 
@@ -194,8 +189,6 @@ harness reports a qualified preparation outcome instead.
 The page imports the package's authored public API rather than importing the
 private provider output throughout the test:
 
-- `/analysis` and `analysisComponentLoader` only for an optional separate tree
-  boundary proof, never as GPU-component readiness evidence;
 - `/gpu-analysis`, `componentGpuAnalyzerLoader`, and ready-capability
   `analyze(input, { summaryResolver, observer? })` for stable execution;
 - `/gpu-analysis-async`, `componentGpuAnalyzerAsyncLoader`, and
@@ -390,12 +383,12 @@ header sequence/dimensions or the node's parent, flags, and name hash: those
 fields are either metadata or consumed by different output lanes. Those facts
 remain owned by focused layout/algorithm tests and later consumer acceptance.
 
-### Why not begin with the shared 200×100 fixture
+### Why not begin with the 200×100 GPU boundary fixture
 
-The existing six-node fixture protects a baseline contract shared across
-Rust, component-boundary, and Millipede tests. It brings diagnostic summary,
-layout-tree, and larger-workload assumptions that are not required to prove the
-first browser lifetime boundary.
+The retained component-boundary GPU workload uses a 200×100 texture and six
+reference records. It brings diagnostic-summary, discovery, and
+larger-workload assumptions that are not required to prove the first browser
+lifetime boundary.
 
 The browser harness may add it later as realistic full-workload acceptance.
 It should not make that fixture the foundation for every lifetime experiment.

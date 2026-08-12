@@ -25,10 +25,6 @@ component-loader/src/
 ├── generated-provider/
 │   └── require-capability.ts
 │
-├── analysis/
-│   ├── entry.ts
-│   └── generated-provider.ts
-│
 ├── boundary-proofs/
 │   └── wasi-async/
 │       ├── entry.ts
@@ -56,7 +52,6 @@ component-loader/src/
 ├── gpu-analysis-standalone-call-scope.ts
 │
 └── host/
-    ├── events.ts
     ├── gpu-output-set.ts
     ├── gpu-output.ts
     ├── gpu-types.ts
@@ -81,9 +76,6 @@ errors.ts                             -> caught-error.ts
 support-jspi.ts                       -> platform-support/jspi.ts
 support-webassembly.ts                -> platform-support/webassembly.ts
 providers/shared.ts                   -> generated-provider/require-capability.ts
-
-analysis.ts                           -> analysis/entry.ts
-providers/analysis.ts                 -> analysis/generated-provider.ts
 
 gpu-analysis.ts                       -> gpu-analysis/entry.ts
 gpu-analysis-capability.ts            -> gpu-analysis/capability.ts
@@ -121,13 +113,11 @@ targets change:
 ```ts
 entry: {
   index: "component-loader/src/index.ts",
-  analysis: "component-loader/src/analysis/entry.ts",
   "gpu-analysis": "component-loader/src/gpu-analysis/entry.ts",
   "gpu-analysis-async": "component-loader/src/gpu-analysis-async/entry.ts",
   "gpu-analysis-frame": "component-loader/src/gpu-analysis-frame/entry.ts",
   "boundary-proofs/wasi-async":
     "component-loader/src/boundary-proofs/wasi-async/entry.ts",
-  "host/events": "component-loader/src/host/events.ts",
   "host/log": "component-loader/src/host/log.ts",
   "host/webgpu": "component-loader/src/host/webgpu/index.ts",
 }

@@ -1,24 +1,22 @@
-//! GPU-free Component Model guest (iteration "C0") for the millipede
-//! webgpu-inspector.
+//! Component Model guest for the millipede webgpu-inspector.
 //!
 //! The boundary contract lives in `wit/`: production worlds are declared in
 //! `wit/world.wit`, while the isolated proof world is declared in
 //! `wit/boundary-proofs-wasi-async.wit`. This crate is their implementation.
-//! The default guest exports the real `analysis` interface. The
-//! `wasi-async-proofs` feature instead selects the isolated WASI async
-//! boundary-proof world. GPU-analysis features select separate browser-safe
-//! sync and Chrome/JSPI async worlds. No wasm-bindgen — by design.
+//! Each build explicitly selects one world feature. `gpu-analysis` selects the
+//! browser-safe stable product world, while `wasi-async-proofs` selects the
+//! isolated WASI async boundary-proof world. The other GPU-analysis features
+//! select the Chrome/JSPI async and scheduler-owned frame worlds. No
+//! wasm-bindgen — by design.
 
 #![warn(missing_docs)]
 
 #[cfg(all(
-    not(feature = "wasi-async-proofs"),
+    feature = "wasi-async-proofs",
     not(feature = "gpu-analysis"),
     not(feature = "gpu-analysis-async"),
     not(feature = "gpu-analysis-frame")
 ))]
-mod analysis;
-#[cfg(feature = "wasi-async-proofs")]
 mod boundary_proofs;
 
 #[cfg(any(

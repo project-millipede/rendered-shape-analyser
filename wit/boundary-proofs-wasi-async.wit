@@ -37,7 +37,7 @@ interface wasi-async-proofs {
 /// JSPI-only world for the isolated WASI async boundary proofs.
 ///
 /// This world deliberately imports only host logging and exports only the
-/// proof interface. It contains neither product analysis nor host events.
+/// proof interface.
 world inspector-boundary-proofs-wasi-async {
   import host-log;
 

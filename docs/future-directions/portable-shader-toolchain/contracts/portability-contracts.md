@@ -18,7 +18,7 @@ rather than redefining them.
 5. Preserve browser WebGPU as a first-class target.
 6. Allow native targets without forcing their runtime details into the browser adapter.
 7. Make generated artifacts deterministic and attributable to pinned tool versions.
-8. Preserve the current GPU-free default build and optional GPU feature boundary.
+8. Preserve an explicit GPU-free build configuration and optional GPU feature boundary.
 9. Avoid runtime shader-toolchain dependencies unless target requirements prove them necessary.
 
 ## Portability invariants
@@ -35,7 +35,7 @@ rather than redefining them.
    checked against one source of truth.
 7. Generated shader artifacts are never edited manually.
 8. Shader tooling must not silently add compiler cost or dependencies to the
-   GPU-free default build.
+   explicit GPU-free build configuration.
 9. Successful translation is not semantic evidence; common conformance inputs
    must exercise every supported target.
 10. A toolchain experiment changes representation only. Algorithm changes need

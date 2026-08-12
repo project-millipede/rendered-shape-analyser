@@ -6,8 +6,8 @@ import {
 import {
   ANALYSIS_TEXTURE_HEIGHT,
   ANALYSIS_TEXTURE_WIDTH,
-} from "../fixtures/analysis-tree.js";
-import { COMPONENT_REFERENCE_BUFFER_SIZE } from "../fixtures/gpu-workload.js";
+  COMPONENT_REFERENCE_BUFFER_SIZE,
+} from "../fixtures/gpu-workload.js";
 
 export interface FakeDevice {
   label: string;

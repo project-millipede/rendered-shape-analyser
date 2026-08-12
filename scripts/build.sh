@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Build the Component Model artifact from the Rust guest.
 #
-# 1. Build an analysis-only component for all browsers.
+# 1. Build the isolated WASI async boundary-proof component for JSPI-capable
+#    runtimes.
 # 2. Build the self-submitting stable GPU-analysis component.
 # 3. Build a JSPI-only async GPU-analysis component.
 # 4. Build the isolated scheduler-owned shared-frame GPU component.
-# 5. Build the isolated WASI async boundary-proof component for JSPI-capable
-#    runtimes.
-# 6. Lift each core wasm to a component: wit-bindgen already embedded the
+# 5. Lift each core wasm to a component: wit-bindgen already embedded the
 #    component-type metadata, so `component new` needs no adapter.
 #    (If metadata were ever missing, run `wasm-tools component embed wit/ …`
 #    first — the documented fallback.)
-# 7. Print each component's world for capability verification: analysis remains
-#    free of `wasi:*`; GPU worlds import only the required `wasi:webgpu`
-#    operations and must not grow DOM/CSS/React or copied-pixel data.
+# 6. Print each component's world for capability verification: the proof
+#    imports only host logging; GPU worlds import only the required
+#    `wasi:webgpu` operations and must not grow DOM/CSS/React or copied-pixel
+#    data.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -41,16 +41,15 @@ CARGO_BUILD_ARGS=(
 
 mkdir -p "$COMPONENT_BUILD_DIR" "$WASI_ASYNC_BOUNDARY_PROOF_DIR"
 rm -f \
-  "$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm" \
   "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis.wasm" \
   "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-async.wasm" \
   "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm" \
   "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"
 
-cargo build "${CARGO_BUILD_ARGS[@]}"
+cargo build "${CARGO_BUILD_ARGS[@]}" --features wasi-async-proofs
 wasm-tools component new \
   "$CORE_WASM" \
-  -o "$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm"
+  -o "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"
 
 cargo build "${CARGO_BUILD_ARGS[@]}" --features gpu-analysis
 wasm-tools component new \
@@ -67,13 +66,8 @@ wasm-tools component new \
   "$CORE_WASM" \
   -o "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm"
 
-cargo build "${CARGO_BUILD_ARGS[@]}" --features wasi-async-proofs
-wasm-tools component new \
-  "$CORE_WASM" \
-  -o "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"
-
-echo "--- analysis world (browser-safe; verify: no wasi:* imports) ---"
-wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm"
+echo "--- wasi-async boundary-proof world (JSPI-only; verify: host-log import only) ---"
+wasm-tools component wit "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"
 
 echo "--- gpu-analysis world (browser-safe; verify: required wasi:webgpu operations only) ---"
 wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis.wasm"
@@ -83,6 +77,3 @@ wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-
 
 echo "--- gpu-analysis-frame world (verify: no encoder finish or gpu-queue submit import) ---"
 wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm"
-
-echo "--- wasi-async boundary-proof world (JSPI-only; verify: host-log import only) ---"
-wasm-tools component wit "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"

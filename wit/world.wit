@@ -1,27 +1,11 @@
-/// Browser-safe analysis-only surface.
-///
-/// This world intentionally excludes the WASI 0.3 async proof interface.
-/// jco currently emits JSPI (`WebAssembly.Suspending`) whenever the component
-/// contains async/future/stream exports, and Safari/Firefox do not support
-/// that API yet. The website loads this world for real inspector behavior.
-world inspector-analysis {
-  import host-log;
-  import host-events;
-
-  export analysis;
-}
-
 /// Browser-safe GPU analysis surface.
 ///
-/// This world is separate from `inspector-analysis` so P1 GPU handle crossing
-/// can evolve without destabilizing the existing CPU/tree analysis component.
-/// It also excludes the WASI 0.3 async proof interface: the compatibility GPU
-/// analyzer starts work synchronously and lets the JavaScript host await browser
-/// WebGPU promises such as the optional one-way diagnostic `mapAsync` summary
-/// readback.
+/// This world excludes the WASI 0.3 async proof interface: the compatibility
+/// GPU analyzer starts work synchronously and lets the JavaScript host await
+/// browser WebGPU promises such as the optional one-way diagnostic `mapAsync`
+/// summary readback.
 world inspector-gpu-analysis {
   import host-log;
-  import host-events;
   import host-gpu;
 
   export gpu-analysis;
@@ -37,7 +21,6 @@ world inspector-gpu-analysis {
 /// reference-guided diagnostic visual output still uses GPU-resident resources.
 world inspector-gpu-analysis-async {
   import host-log;
-  import host-events;
   import host-gpu;
 
   export gpu-analysis-async;
@@ -52,7 +35,6 @@ world inspector-gpu-analysis-async {
 /// removable without changing the stable or JSPI component lifecycles.
 world inspector-gpu-analysis-frame {
   import host-log;
-  import host-events;
   import host-gpu;
 
   export gpu-analysis-frame;
