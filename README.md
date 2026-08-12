@@ -230,6 +230,7 @@ with its boundary-proof entry.
 
 - [Component loader guide](component-loader/README.md)
 - [Component capability loading contract](docs/architecture/component-capability-loading-contract.md)
+- [Component-host communication patterns](docs/architecture/component-host-communication-patterns.md)
 - [GPU compute execution contract](docs/architecture/gpu-compute-execution-contract.md)
 - [JCO-generated artifact baseline](docs/tooling/jco-generated-artifact-baseline.md)
 - [Browser lifetime evidence plan](docs/testing/browser-lifetime/README.md)

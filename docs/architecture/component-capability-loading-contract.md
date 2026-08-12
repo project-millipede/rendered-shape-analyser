@@ -170,6 +170,11 @@ requirement cannot be represented by logical resources, for example:
 - unavoidable guest-global state that must be reset by instance replacement;
 - hard guest-memory or fault isolation between sessions.
 
+The distinction between static host-module binding, explicit instantiation,
+per-call borrowed resources, streams, wrapper observers, and browser-global
+events is recorded in
+[Component-host communication patterns](component-host-communication-patterns.md).
+
 The current architecture has none of those requirements. Provider-specific
 instance factories are not unload mechanisms, and discarded instances do not
 provide deterministic ESM or WebAssembly reclamation. A future native browser
