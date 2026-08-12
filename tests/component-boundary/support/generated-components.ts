@@ -115,14 +115,14 @@ interface FrameGpuModule {
   gpuAnalysisFrame: FrameGpuModuleExports;
 }
 
-export interface WasiModuleExports {
+export interface WasiAsyncBoundaryProofExports {
   proveAsyncFunc(value: number): Promise<number>;
   proveFuture(value: number): PromiseLike<number>;
   proveStream(value: string): Promise<AsyncIterable<number>>;
 }
 
-interface WasiModule {
-  wasiAsyncProofs: WasiModuleExports;
+interface WasiAsyncBoundaryProofModule {
+  wasiAsyncProofs: WasiAsyncBoundaryProofExports;
 }
 
 type GeneratedWorld =
@@ -130,7 +130,7 @@ type GeneratedWorld =
   | "gpu-analysis"
   | "gpu-analysis-async"
   | "gpu-analysis-frame"
-  | "wasi-0.3";
+  | "boundary-proofs/wasi-async";
 
 const generatedModuleUrl = (world: GeneratedWorld): string =>
   new URL(
@@ -153,5 +153,8 @@ export const loadAsyncGpuModule = (): Promise<AsyncGpuModule> =>
 export const loadFrameGpuModule = (): Promise<FrameGpuModule> =>
   importGeneratedWorld<FrameGpuModule>("gpu-analysis-frame");
 
-export const loadWasiModule = (): Promise<WasiModule> =>
-  importGeneratedWorld<WasiModule>("wasi-0.3");
+export const loadWasiAsyncBoundaryProofModule =
+  (): Promise<WasiAsyncBoundaryProofModule> =>
+    importGeneratedWorld<WasiAsyncBoundaryProofModule>(
+      "boundary-proofs/wasi-async",
+    );

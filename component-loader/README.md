@@ -75,9 +75,9 @@ contracts differ: stable owns call-local summary resolution, async relies on
 the component's JSPI-returned summary, and shared-frame returns a pending
 summary for the scheduler to resolve or dispose. Their optional observer
 parameter is also preserved at the adapter boundary; the current application
-does not supply one. The explicit browser diagnostic is exported separately as
-`@millipede/surface-inspector-browser/diagnostics`, and ordinary backend
-selection neither imports nor runs it.
+does not supply one. The explicit browser boundary-proof entry is exported
+separately as `@millipede/surface-inspector-browser/boundary-proofs`, and
+ordinary backend selection neither imports nor runs it.
 
 Prepared component capabilities are module-wide and survive GPU-device
 replacement. Millipede separately owns each device-generation adapter,
@@ -96,14 +96,14 @@ pending, and P2 still owns the final discovery/session/resource topology.
 | `/gpu-analysis` / `component-gpu`             | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         | WebGPU; no JSPI     |
 | `/gpu-analysis-frame` / `component-gpu-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` | WebGPU; no JSPI     |
 | `/gpu-analysis-async` / `component-gpu-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          | WebGPU plus JSPI    |
-| `/diagnostics` / isolated `wasi-0.3` proof    | `wasiAsyncProofsComponentLoader`  | `proveAsyncFunc()`, `proveFuture()`, or `proveStream()`  | JSPI                |
+| `/boundary-proofs/wasi-async`                 | `wasiAsyncProofsComponentLoader`  | `proveAsyncFunc()`, `proveFuture()`, or `proveStream()`  | JSPI                |
 
-`/diagnostics` is only the isolated WASI async projection proof. It is not a
-home for GPU diagnostics and does not remove GPU summary readback from any
-analyzer. Stable analysis resolves its call-local compact summary after
-submission, async analysis returns the Rust-decoded summary, and shared-frame
-analysis returns a pending summary that its scheduler resolves after submit or
-disposes when the frame is abandoned.
+`/boundary-proofs/wasi-async` is only the isolated WASI async projection
+proof. It is not a home for GPU diagnostics and does not remove GPU summary
+readback from any analyzer. Stable analysis resolves its call-local compact
+summary after submission, async analysis returns the Rust-decoded summary, and
+shared-frame analysis returns a pending summary that its scheduler resolves
+after submit or disposes when the frame is abandoned.
 
 ### Stable GPU analysis
 
@@ -220,7 +220,9 @@ pnpm run loader:build
 ```
 
 Authored TypeScript uses extensionless relative imports. Private generated
-imports are isolated by world under `src/providers/`.
+imports are isolated in the matching capability's adapter: production
+adapters remain under `src/providers/`, while the WASI proof adapter is
+colocated under `src/boundary-proofs/wasi-async/`.
 
 The current generated GPU worlds still map to one canonical
 `host/webgpu` entry. Its emitted implementation chunk therefore contains the
@@ -247,13 +249,13 @@ because one consumer is the async backend.
 | `src/gpu-analysis-frame.ts`             | Synchronous borrowed-frame capability and `componentGpuFrameAnalyzerLoader`        |
 | `src/gpu-analysis-async-capability.ts`  | Private JSPI invocation wrapper and observer boundary                              |
 | `src/gpu-analysis-frame-capability.ts`  | Private synchronous frame wrapper and mandatory throw/abandon boundary             |
-| `src/diagnostics.ts`                    | Isolated WASI async-proof capability; never a GPU-summary replacement              |
+| `src/boundary-proofs/wasi-async/`       | Isolated WASI async-proof entry and generated-provider adapter                     |
 | `src/capability-state.ts`               | Pure one-shot preparation states, triggers, and legal transition function          |
 | `src/capability.ts`                     | Prepare-only module loader, typed outcomes, and shared Promise ownership           |
 | `src/errors.ts`                         | No-throw normalization for provider and observer diagnostics                       |
 | `src/support-webassembly.ts`            | Baseline WebAssembly gate for non-JSPI variants                                    |
 | `src/support-jspi.ts`                   | Exact JSPI gate used only by async GPU and isolated-proof variants                 |
-| `src/providers/*.ts`                    | Private per-world adapters from generated exports to authored capabilities         |
+| `src/providers/*.ts`                    | Private production-world adapters from generated exports to authored capabilities  |
 | `src/gpu-analysis-dispatch.ts`          | Variant-neutral request metadata construction                                      |
 | `src/gpu-analysis-runtime.ts`           | Stable/async call-local registration, output transfer, and cleanup                 |
 | `src/gpu-analysis-observer.ts`          | Optional provider-neutral post-readiness invocation observations                   |

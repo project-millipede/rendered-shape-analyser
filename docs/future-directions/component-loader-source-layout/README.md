@@ -1,6 +1,7 @@
 # Component Loader Source Layout
 
-Status: deferred design; not implemented.
+Status: remaining production-loader layout deferred; WASI async boundary-proof
+colocation implemented.
 
 This note preserves the agreed source-layout cleanup for a later, dedicated
 path-only refactor. It must not change runtime behavior, public package
@@ -28,9 +29,10 @@ component-loader/src/
 │   ├── entry.ts
 │   └── generated-provider.ts
 │
-├── diagnostics/
-│   ├── entry.ts
-│   └── generated-provider.ts
+├── boundary-proofs/
+│   └── wasi-async/
+│       ├── entry.ts
+│       └── generated-provider.ts
 │
 ├── gpu-analysis/
 │   ├── entry.ts
@@ -82,8 +84,6 @@ providers/shared.ts                   -> generated-provider/require-capability.t
 
 analysis.ts                           -> analysis/entry.ts
 providers/analysis.ts                 -> analysis/generated-provider.ts
-diagnostics.ts                        -> diagnostics/entry.ts
-providers/wasi-async-proofs.ts        -> diagnostics/generated-provider.ts
 
 gpu-analysis.ts                       -> gpu-analysis/entry.ts
 gpu-analysis-capability.ts            -> gpu-analysis/capability.ts
@@ -109,6 +109,10 @@ gpu-analysis-runtime.ts               -> gpu-analysis-standalone-call-scope.ts
 `AnalysisDispatch` type is a separate API decision and is not required by the
 layout move.
 
+The WASI async proof is already colocated under
+`boundary-proofs/wasi-async/`; it is not part of the remaining path-only
+refactor.
+
 ## Build entries
 
 Keep the emitted entry names and package exports unchanged. Only the source
@@ -121,16 +125,18 @@ entry: {
   "gpu-analysis": "component-loader/src/gpu-analysis/entry.ts",
   "gpu-analysis-async": "component-loader/src/gpu-analysis-async/entry.ts",
   "gpu-analysis-frame": "component-loader/src/gpu-analysis-frame/entry.ts",
-  diagnostics: "component-loader/src/diagnostics/entry.ts",
+  "boundary-proofs/wasi-async":
+    "component-loader/src/boundary-proofs/wasi-async/entry.ts",
   "host/events": "component-loader/src/host/events.ts",
   "host/log": "component-loader/src/host/log.ts",
   "host/webgpu": "component-loader/src/host/webgpu/index.ts",
 }
 ```
 
-The feature directories stay exactly one level below `src`. Their generated
-providers therefore retain the existing `../../../pkg/generated/...` import
-depth and do not require a generated-runtime rewrite-policy change.
+The remaining production feature directories stay exactly one level below
+`src` and retain the existing `../../../pkg/generated/...` import depth. The
+already-nested boundary-proof provider uses its explicit four-parent source to
+three-parent emitted-runtime path mapping.
 
 ## Required invariants
 

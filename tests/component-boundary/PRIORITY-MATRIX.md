@@ -63,7 +63,7 @@ code rather than additional test categories.
 |        8 | Stable reaches the intended truth-buffer branch, then traps without captured pipeline/output, finish/submission, resolution, or mapping effects.  |
 |        8 | Async reaches the intended truth-buffer branch, then rejects without captured pipeline/output, finish/submission, resolution, or mapping effects. |
 
-### `wasi.integration.test.ts`
+### `boundary-proofs-wasi-async.integration.test.ts`
 
 | Priority | Protected R2 behavior                                         |
 | -------: | ------------------------------------------------------------- |
@@ -71,10 +71,10 @@ code rather than additional test categories.
 |        9 | A WIT future projects to the expected Promise-like result.    |
 |        8 | A WIT byte stream projects to the expected semantic bytes.    |
 
-This `wasi-0.3` matrix is the complete meaning of the public `/diagnostics`
-subpath. The stable, async, and shared-frame summary assertions above remain
-part of their GPU analyzer contracts; `/diagnostics` neither owns nor replaces
-them.
+This matrix is the complete meaning of the public
+`/boundary-proofs/wasi-async` subpath. The stable, async, and shared-frame
+summary assertions above remain part of their GPU analyzer contracts; the
+boundary-proof entry neither owns nor replaces them.
 
 ## Unit tests
 

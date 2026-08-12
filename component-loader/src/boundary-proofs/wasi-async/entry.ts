@@ -1,12 +1,12 @@
 import {
   createComponentCapabilityLoader,
   type ComponentCapabilityLoader,
-} from "./capability";
+} from "../../capability";
 import {
   instantiateWasiAsyncProofsComponent,
   type WasiAsyncProofsInterface,
-} from "./providers/wasi-async-proofs";
-import { probeJspiSupport } from "./support-jspi";
+} from "./generated-provider";
+import { probeJspiSupport } from "../../support-jspi";
 
 /** Ready JSPI proof capability kept outside every production analyzer entry. */
 export interface WasiAsyncProofsCapability {
@@ -15,7 +15,7 @@ export interface WasiAsyncProofsCapability {
   readonly proveStream: (label: string) => Promise<AsyncIterable<number>>;
 }
 
-/** Normalize generated proof exports into the authored diagnostic surface. */
+/** Normalize generated proof exports into the authored boundary-proof surface. */
 const instantiateWasiAsyncProofsCapability =
   async (): Promise<WasiAsyncProofsCapability> => {
     const proofs: WasiAsyncProofsInterface =
@@ -47,7 +47,7 @@ export const wasiAsyncProofsComponentLoader: ComponentCapabilityLoader<WasiAsync
     probeSupport: probeJspiSupport,
     reportFailure(error) {
       console.info(
-        "[wasi-0.3][inspector-component] component failed to instantiate",
+        "[boundary-proofs/wasi-async][inspector-component] component failed to instantiate",
         error,
       );
     },
@@ -58,4 +58,4 @@ export type {
   ComponentCapabilityPrepareResult,
   ComponentCapabilityState,
   ComponentUnsupportedReason,
-} from "./capability";
+} from "../../capability";

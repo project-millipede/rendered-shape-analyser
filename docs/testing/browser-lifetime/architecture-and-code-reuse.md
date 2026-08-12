@@ -79,24 +79,24 @@ The package exports several independent component worlds. They are not one
 generic “component call,” and their prerequisites must not bleed into each
 other.
 
-| World                | Package subpath       | Loader                            | Ready-capability operation                               | WebGPU | JSPI | Browser-lifetime role                         |
-| -------------------- | --------------------- | --------------------------------- | -------------------------------------------------------- | -----: | ---: | --------------------------------------------- |
-| `analysis`           | `/analysis`           | `analysisComponentLoader`         | `analyzeTree(...)`                                       |     No |   No | Optional separate non-GPU boundary diagnostic |
-| `gpu-analysis`       | `/gpu-analysis`       | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |    Yes |   No | Initial stable lifetime path                  |
-| `gpu-analysis-frame` | `/gpu-analysis-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |    Yes |   No | Scheduler-owned encoder path                  |
-| `gpu-analysis-async` | `/gpu-analysis-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |    Yes |  Yes | Conditional asynchronous path                 |
-| `wasi-0.3`           | `/diagnostics`        | `wasiAsyncProofsComponentLoader`  | Explicit proof operation                                 |     No |  Yes | Outside GPU-lifetime scope                    |
+| World                        | Package subpath               | Loader                            | Ready-capability operation                               | WebGPU | JSPI | Browser-lifetime role                 |
+| ---------------------------- | ----------------------------- | --------------------------------- | -------------------------------------------------------- | -----: | ---: | ------------------------------------- |
+| `analysis`                   | `/analysis`                   | `analysisComponentLoader`         | `analyzeTree(...)`                                       |     No |   No | Optional separate tree boundary proof |
+| `gpu-analysis`               | `/gpu-analysis`               | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |    Yes |   No | Initial stable lifetime path          |
+| `gpu-analysis-frame`         | `/gpu-analysis-frame`         | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |    Yes |   No | Scheduler-owned encoder path          |
+| `gpu-analysis-async`         | `/gpu-analysis-async`         | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |    Yes |  Yes | Conditional asynchronous path         |
+| `boundary-proofs/wasi-async` | `/boundary-proofs/wasi-async` | `wasiAsyncProofsComponentLoader`  | Explicit proof operation                                 |     No |  Yes | Outside GPU-lifetime scope            |
 
-The separate non-GPU analysis diagnostic must not request an adapter or
+The separate tree boundary proof must not request an adapter or
 construct the GPU fixture. It loads a different component artifact and should
 normally be skipped by the GPU-lifetime path. Its success is not evidence that
 the selected GPU component is ready or that any WebGPU resource-lifetime
 property holds. The isolated WASI async proof can confirm a JSPI projection
-but cannot establish GPU ownership or destruction. The `/diagnostics` split
-isolates those WASI proofs; it does not separate GPU-to-CPU summary readback
-from the stable, async, or frame analyzer capabilities. Millipede reaches this
-proof only through the explicit
-`@millipede/surface-inspector-browser/diagnostics` entry; ordinary backend
+but cannot establish GPU ownership or destruction. The
+`/boundary-proofs/wasi-async` split isolates those WASI proofs; it does not
+separate GPU-to-CPU summary readback from the stable, async, or frame analyzer
+capabilities. Millipede reaches this proof only through the explicit
+`@millipede/surface-inspector-browser/boundary-proofs` entry; ordinary backend
 selection does not import it.
 
 ## Package and module identity
@@ -122,8 +122,7 @@ The implementation therefore must:
 2. import one public variant subpath rather than private provider modules;
 3. resolve each built host module through one canonical browser URL;
 4. avoid bundling a private second copy of the host;
-5. keep each generated-world import inside its matching adapter under
-   [`component-loader/src/providers/`](../../../component-loader/src/providers/);
+5. keep each generated-world import inside its matching private adapter;
 6. use a fresh page or browser context when a scenario requires fresh memoized
    component state, instead of adding a production reset API.
 
@@ -149,7 +148,7 @@ topology.
 
 Future C1/V1 acceptance proves selected loading against the final deployed
 consumer by recording Chromium's actual requests: the selected variant must be
-requested, unselected and diagnostic worlds must remain absent, and execution
+requested, unselected and boundary-proof worlds must remain absent, and execution
 after `ready` must trigger no further component loading. This browser evidence
 is authoritative for the deployed selection boundary. That C1/V1 evidence and
 the H1 harness remain pending.
@@ -195,8 +194,8 @@ harness reports a qualified preparation outcome instead.
 The page imports the package's authored public API rather than importing the
 private provider output throughout the test:
 
-- `/analysis` and `analysisComponentLoader` only for an optional separate
-  non-GPU diagnostic, never as GPU-component readiness evidence;
+- `/analysis` and `analysisComponentLoader` only for an optional separate tree
+  boundary proof, never as GPU-component readiness evidence;
 - `/gpu-analysis`, `componentGpuAnalyzerLoader`, and ready-capability
   `analyze(input, { summaryResolver, observer? })` for stable execution;
 - `/gpu-analysis-async`, `componentGpuAnalyzerAsyncLoader`, and
@@ -210,9 +209,11 @@ scope used by a direct package consumer.
 
 ### Generated module adapter
 
-Each file under `component-loader/src/providers/` is the only authored adapter
-for its matching generated world. Browser test files must not introduce their
-own scattered imports into generated package internals.
+Each generated world has one authored private adapter. Production adapters
+remain under `component-loader/src/providers/`; the WASI proof adapter is
+colocated under `component-loader/src/boundary-proofs/wasi-async/`. Browser
+test files must not introduce their own scattered imports into generated
+package internals.
 
 A private H1 proof artifact may require one test-only generated entrypoint
 later. That entrypoint must remain isolated, unpublished, and mapped to the
@@ -908,23 +909,24 @@ native execution into one implementation abstraction prematurely.
 
 ## Source ownership map
 
-| Source                                                                                                        | Responsibility                                                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`component-loader/src/index.ts`](../../../component-loader/src/index.ts)                                     | Shared type-only package root                                                                                                                             |
-| [`component-loader/src/gpu-analysis.ts`](../../../component-loader/src/gpu-analysis.ts)                       | Stable loader, direct capability, call-local resolver, and output transfer                                                                                |
-| [`component-loader/src/gpu-analysis-async.ts`](../../../component-loader/src/gpu-analysis-async.ts)           | Async loader, loader-owned JSPI gate, direct capability, and output transfer                                                                              |
-| [`component-loader/src/gpu-analysis-frame.ts`](../../../component-loader/src/gpu-analysis-frame.ts)           | Frame loader, borrowed-encoder capability, synchronous outputs, pending summary                                                                           |
-| [`component-loader/src/providers/`](../../../component-loader/src/providers/)                                 | Private generated-world adapters, one per capability family                                                                                               |
-| [`component-loader/src/gpu-analysis-dispatch.ts`](../../../component-loader/src/gpu-analysis-dispatch.ts)     | Variant-neutral request metadata construction                                                                                                             |
-| [`component-loader/src/host/gpu-types.ts`](../../../component-loader/src/host/gpu-types.ts)                   | Inputs, outputs, resolver, submission, and pending-summary contracts                                                                                      |
-| [`component-loader/src/host/gpu-output-set.ts`](../../../component-loader/src/host/gpu-output-set.ts)         | Canonical renderer-output ownership shape and exhaustive traversal                                                                                        |
-| [`component-loader/src/host/gpu-output.ts`](../../../component-loader/src/host/gpu-output.ts)                 | Variant-neutral plan correlation and native output extraction                                                                                             |
-| [`component-loader/src/host/gpu-summary-stable.ts`](../../../component-loader/src/host/gpu-summary-stable.ts) | Stable-world summary validation and resolver ownership transfer                                                                                           |
-| [`component-loader/src/host/gpu-summary-frame.ts`](../../../component-loader/src/host/gpu-summary-frame.ts)   | Shared-frame pending-summary lifecycle                                                                                                                    |
-| [`component-loader/src/host/webgpu/`](../../../component-loader/src/host/webgpu/)                             | Production browser implementation and temporary registry for imported `wasi:webgpu` resources                                                             |
-| [`tests/component-boundary/`](../../../tests/component-boundary/)                                             | Deterministic fake-host and generated-component evidence                                                                                                  |
-| Planned `tests/browser-lifetime/`                                                                             | Real Chromium execution, ownership, and measurement evidence                                                                                              |
-| Millipede `surface-inspector-browser`                                                                         | Three exact lazy device adapters, explicit diagnostics, preparation/retirement, capture, selection, scheduling, rendering, and later black-box acceptance |
+| Source                                                                                                          | Responsibility                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`component-loader/src/index.ts`](../../../component-loader/src/index.ts)                                       | Shared type-only package root                                                                                                                                 |
+| [`component-loader/src/gpu-analysis.ts`](../../../component-loader/src/gpu-analysis.ts)                         | Stable loader, direct capability, call-local resolver, and output transfer                                                                                    |
+| [`component-loader/src/gpu-analysis-async.ts`](../../../component-loader/src/gpu-analysis-async.ts)             | Async loader, loader-owned JSPI gate, direct capability, and output transfer                                                                                  |
+| [`component-loader/src/gpu-analysis-frame.ts`](../../../component-loader/src/gpu-analysis-frame.ts)             | Frame loader, borrowed-encoder capability, synchronous outputs, pending summary                                                                               |
+| [`component-loader/src/providers/`](../../../component-loader/src/providers/)                                   | Private production generated-world adapters                                                                                                                   |
+| [`component-loader/src/boundary-proofs/wasi-async/`](../../../component-loader/src/boundary-proofs/wasi-async/) | Isolated WASI async proof entry and generated-provider adapter                                                                                                |
+| [`component-loader/src/gpu-analysis-dispatch.ts`](../../../component-loader/src/gpu-analysis-dispatch.ts)       | Variant-neutral request metadata construction                                                                                                                 |
+| [`component-loader/src/host/gpu-types.ts`](../../../component-loader/src/host/gpu-types.ts)                     | Inputs, outputs, resolver, submission, and pending-summary contracts                                                                                          |
+| [`component-loader/src/host/gpu-output-set.ts`](../../../component-loader/src/host/gpu-output-set.ts)           | Canonical renderer-output ownership shape and exhaustive traversal                                                                                            |
+| [`component-loader/src/host/gpu-output.ts`](../../../component-loader/src/host/gpu-output.ts)                   | Variant-neutral plan correlation and native output extraction                                                                                                 |
+| [`component-loader/src/host/gpu-summary-stable.ts`](../../../component-loader/src/host/gpu-summary-stable.ts)   | Stable-world summary validation and resolver ownership transfer                                                                                               |
+| [`component-loader/src/host/gpu-summary-frame.ts`](../../../component-loader/src/host/gpu-summary-frame.ts)     | Shared-frame pending-summary lifecycle                                                                                                                        |
+| [`component-loader/src/host/webgpu/`](../../../component-loader/src/host/webgpu/)                               | Production browser implementation and temporary registry for imported `wasi:webgpu` resources                                                                 |
+| [`tests/component-boundary/`](../../../tests/component-boundary/)                                               | Deterministic fake-host and generated-component evidence                                                                                                      |
+| Planned `tests/browser-lifetime/`                                                                               | Real Chromium execution, ownership, and measurement evidence                                                                                                  |
+| Millipede `surface-inspector-browser`                                                                           | Three exact lazy device adapters, explicit boundary proofs, preparation/retirement, capture, selection, scheduling, rendering, and later black-box acceptance |
 
 ## Architectural invariants
 

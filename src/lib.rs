@@ -1,21 +1,25 @@
 //! GPU-free Component Model guest (iteration "C0") for the millipede
 //! webgpu-inspector.
 //!
-//! The boundary contract lives in `wit/` — start at `wit/world.wit`, then
-//! follow the split interface files. This crate is its implementation. The
-//! guest always exports the real `analysis` interface. With the
-//! `wasi-async-proofs` feature enabled it also exports the isolated async
-//! learning harness. GPU-analysis features are split into browser-safe sync
-//! and Chrome/JSPI async worlds. No wasm-bindgen — by design.
+//! The boundary contract lives in `wit/`: production worlds are declared in
+//! `wit/world.wit`, while the isolated proof world is declared in
+//! `wit/boundary-proofs-wasi-async.wit`. This crate is their implementation.
+//! The default guest exports the real `analysis` interface. The
+//! `wasi-async-proofs` feature instead selects the isolated WASI async
+//! boundary-proof world. GPU-analysis features select separate browser-safe
+//! sync and Chrome/JSPI async worlds. No wasm-bindgen — by design.
 
 #![warn(missing_docs)]
 
 #[cfg(all(
+    not(feature = "wasi-async-proofs"),
     not(feature = "gpu-analysis"),
     not(feature = "gpu-analysis-async"),
     not(feature = "gpu-analysis-frame")
 ))]
 mod analysis;
+#[cfg(feature = "wasi-async-proofs")]
+mod boundary_proofs;
 
 #[cfg(any(
     feature = "gpu-analysis",
@@ -43,9 +47,6 @@ mod gpu_shared;
 mod reference_diagnostics;
 mod shared;
 mod wit;
-
-#[cfg(feature = "wasi-async-proofs")]
-mod wasi;
 
 use crate::wit::generated as bindings;
 use shared::Component;

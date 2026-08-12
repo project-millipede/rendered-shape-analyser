@@ -52,6 +52,10 @@ const commonMappings = [
   ["millipede:inspector/host-events@0.1.0", "../../host/events.js"],
 ] as const;
 
+const wasiAsyncBoundaryProofMappings = [
+  ["millipede:inspector/host-log@0.1.0", "../../../host/log.js"],
+] as const;
+
 const gpuMappings = [
   ...commonMappings,
   ["wasi:webgpu/webgpu@0.0.1", "../../host/webgpu/index.js"],
@@ -85,9 +89,9 @@ const componentTranspiles: readonly ComponentTranspile[] = [
   // explicitly so generated Wasm calls use `WebAssembly.promising` instead of
   // the synchronous path.
   {
-    artifact: "inspector-component.wasi-0.3.wasm",
-    directory: "wasi-0.3",
-    mappings: commonMappings,
+    artifact: "boundary-proofs/wasi-async/inspector-component.wasm",
+    directory: "boundary-proofs/wasi-async",
+    mappings: wasiAsyncBoundaryProofMappings,
     asyncExports: [
       "millipede:inspector/wasi-async-proofs@0.1.0#prove-future",
       "millipede:inspector/wasi-async-proofs@0.1.0#prove-stream",

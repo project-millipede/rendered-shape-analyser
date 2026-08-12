@@ -33,3 +33,13 @@ interface wasi-async-proofs {
   /// `AsyncIterable<number>`.
   prove-stream: func(label: string) -> stream<u8>;
 }
+
+/// JSPI-only world for the isolated WASI async boundary proofs.
+///
+/// This world deliberately imports only host logging and exports only the
+/// proof interface. It contains neither product analysis nor host events.
+world inspector-boundary-proofs-wasi-async {
+  import host-log;
+
+  export wasi-async-proofs;
+}

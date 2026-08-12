@@ -75,13 +75,13 @@ final discovery/session/resource topology.
 
 ## What it provides
 
-| Capability subpath / Millipede mode           | Purpose                                        | Runtime requirement | Execution / command ownership           |
-| --------------------------------------------- | ---------------------------------------------- | ------------------- | --------------------------------------- |
-| `/analysis`                                   | C0 typed, non-GPU analysis boundary            | Browser Wasm        | Synchronous; no GPU commands            |
-| `/gpu-analysis` / `component-gpu`             | Stable P1 GPU analysis                         | WebGPU              | Component finishes and submits          |
-| `/gpu-analysis-frame` / `component-gpu-frame` | P1 analysis inside a scheduler-owned frame     | WebGPU              | Scheduler alone finishes and submits    |
-| `/gpu-analysis-async` / `component-gpu-async` | Experimental P1 async summary/readback path    | WebGPU + JSPI       | Component submits and awaits completion |
-| `/diagnostics` / isolated `wasi-0.3` proof    | Async Component Model proof; not a production analyzer API | JSPI                | Proof-only; no GPU commands             |
+| Capability subpath / Millipede mode           | Purpose                                                    | Runtime requirement | Execution / command ownership           |
+| --------------------------------------------- | ---------------------------------------------------------- | ------------------- | --------------------------------------- |
+| `/analysis`                                   | C0 typed, non-GPU analysis boundary                        | Browser Wasm        | Synchronous; no GPU commands            |
+| `/gpu-analysis` / `component-gpu`             | Stable P1 GPU analysis                                     | WebGPU              | Component finishes and submits          |
+| `/gpu-analysis-frame` / `component-gpu-frame` | P1 analysis inside a scheduler-owned frame                 | WebGPU              | Scheduler alone finishes and submits    |
+| `/gpu-analysis-async` / `component-gpu-async` | Experimental P1 async summary/readback path                | WebGPU + JSPI       | Component submits and awaits completion |
+| `/boundary-proofs/wasi-async`                 | Async Component Model proof; not a production analyzer API | JSPI                | Proof-only; no GPU commands             |
 
 The caller supplies one browser `GPUDevice`, the captured-pixel
 `GPUTexture`, and the reference buffer when required. Rust validates the
@@ -99,9 +99,9 @@ never destroys caller-owned devices, textures, reference buffers, or borrowed
 encoders. After transfer, the browser result, resolver, or scheduler owns the
 native resource's terminal action.
 
-`/diagnostics` names only the isolated `wasi-0.3` async projection proof. It
-does not contain, replace, or disable GPU summary readback: stable, async, and
-shared-frame analysis retain their own compact-summary paths.
+`/boundary-proofs/wasi-async` names only the isolated WASI async projection
+proof. It does not contain, replace, or disable GPU summary readback: stable,
+async, and shared-frame analysis retain their own compact-summary paths.
 
 ## Where it fits
 
@@ -118,8 +118,8 @@ This repository owns the component boundary, Rust analysis workloads, generated
 browser payload, and authored browser host adapter. Millipede owns capture,
 backend selection, device epochs, frame scheduling, submission, publication,
 rendering, UI state, and the explicit
-`@millipede/surface-inspector-browser/diagnostics` integration. Normal backend
-selection does not import or execute that diagnostic.
+`@millipede/surface-inspector-browser/boundary-proofs` integration. Normal
+backend selection does not import or execute those proofs.
 
 ## Analysis pipeline
 
@@ -182,12 +182,14 @@ under `packages/surface/inspector-browser/docs/`, including
 | `wit/`                                                                                               | Source-of-truth component interfaces                                   |
 | `wkg/`, `xtask/`, `wit/deps/`                                                                        | WIT dependency policy and generated dependencies                       |
 | `src/analysis/`                                                                                      | Non-GPU analysis and aggregate math                                    |
+| `src/boundary_proofs/wasi_async/`                                                                    | Isolated WASI async boundary-proof implementation                      |
 | `src/edge_discovery/`                                                                                | Pixel-derived discovery planning, shaders, resources, and recording    |
 | `src/reference_diagnostics/`                                                                         | Reference-guided statistics and visual diagnostics                     |
 | `src/gpu_shared/`                                                                                    | Validation, planning, and command recording shared by GPU worlds       |
 | `src/gpu_analysis*/`                                                                                 | Stable, async, and shared-frame component exports                      |
 | `component-loader/src/`                                                                              | Authored TypeScript capability loaders and browser host                |
-| `component-loader/src/providers/`                                                                    | Private per-world generated-provider adapters                          |
+| `component-loader/src/providers/`                                                                    | Private production-world generated-provider adapters                   |
+| `component-loader/src/boundary-proofs/wasi-async/`                                                   | Isolated proof entry and its generated-provider adapter                |
 | `tests/component-boundary/`                                                                          | Typed unit tests and generated-component integration tests             |
 | `scripts/build.sh`                                                                                   | Build and verify all component worlds                                  |
 | `scripts/sync.sh`                                                                                    | Regenerate browser payloads and rebuild the loader                     |
@@ -227,7 +229,9 @@ build -> test -> sync -> refresh Millipede's local file dependency
 
 `scripts/sync.sh` is the only writer of `pkg/generated/`. Authored loader
 imports use extensionless relative paths. Each generated world is reached only
-through its matching private adapter in `component-loader/src/providers/`.
+through its matching private adapter; production adapters remain under
+`component-loader/src/providers/`, while the WASI proof adapter is colocated
+with its boundary-proof entry.
 
 ## Further documentation
 

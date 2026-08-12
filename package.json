@@ -30,9 +30,9 @@
       "types": "./component-loader/dist/gpu-analysis-frame.d.ts",
       "default": "./component-loader/dist/gpu-analysis-frame.js"
     },
-    "./diagnostics": {
-      "types": "./component-loader/dist/diagnostics.d.ts",
-      "default": "./component-loader/dist/diagnostics.js"
+    "./boundary-proofs/wasi-async": {
+      "types": "./component-loader/dist/boundary-proofs/wasi-async.d.ts",
+      "default": "./component-loader/dist/boundary-proofs/wasi-async.js"
     }
   },
   "files": [

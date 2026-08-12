@@ -62,21 +62,22 @@ The preparation step clears only `target/component-tests/`, compiles the typed
 host into `target/component-tests/host/`, and transpiles the five worlds into
 `target/component-tests/generated/`. The repository already ignores `target/`.
 
-| Generated world      | Component artifact                            |
-| -------------------- | --------------------------------------------- |
-| `analysis`           | `inspector-component.analysis.wasm`           |
-| `gpu-analysis`       | `inspector-component.gpu-analysis.wasm`       |
-| `gpu-analysis-async` | `inspector-component.gpu-analysis-async.wasm` |
-| `gpu-analysis-frame` | `inspector-component.gpu-analysis-frame.wasm` |
-| `wasi-0.3`           | `inspector-component.wasi-0.3.wasm`           |
+| Generated world              | Component artifact                                    |
+| ---------------------------- | ----------------------------------------------------- |
+| `analysis`                   | `inspector-component.analysis.wasm`                   |
+| `gpu-analysis`               | `inspector-component.gpu-analysis.wasm`               |
+| `gpu-analysis-async`         | `inspector-component.gpu-analysis-async.wasm`         |
+| `gpu-analysis-frame`         | `inspector-component.gpu-analysis-frame.wasm`         |
+| `boundary-proofs/wasi-async` | `boundary-proofs/wasi-async/inspector-component.wasm` |
 
-The analysis world and three GPU worlds exercise product boundaries. `wasi-0.3`
-is deliberately separate: it proves current WIT/JCO async projections without
-adding those proof exports to the product API.
+The analysis world and three GPU worlds exercise product boundaries. The
+`boundary-proofs/wasi-async` world is deliberately separate: it proves current
+WIT/JCO async projections without adding those proof exports to the product
+API.
 
-The public `/diagnostics` subpath selects only that isolated `wasi-0.3` proof.
-It does not absorb or replace GPU summary behavior. Stable integration still
-proves its readback plan, async integration still proves the Rust-decoded
+The public `/boundary-proofs/wasi-async` subpath selects only that isolated
+proof. It does not absorb or replace GPU summary behavior. Stable integration
+still proves its readback plan, async integration still proves the Rust-decoded
 summary, and shared-frame integration still proves the pending-summary
 descriptor used after scheduler submission.
 
@@ -165,11 +166,11 @@ the pure validation arithmetic again.
 
 `src/analysis/stats.rs::tests::fixture`,
 `tests/component-boundary/fixtures/analysis-tree.ts`, and Millipede's explicit
-component-boundary diagnostic use the same six-node fixture. Its hand-computed
+component-boundary proof use the same six-node fixture. Its hand-computed
 expectations are six nodes, maximum depth three, two ghosts, total area 10,550,
 and coverage 0.425. A fixture change must update all three copies and their
-expectations together. Millipede exposes that diagnostic only through the
-explicit `@millipede/surface-inspector-browser/diagnostics` subpath; ordinary
+expectations together. Millipede exposes that proof only through the explicit
+`@millipede/surface-inspector-browser/boundary-proofs` subpath; ordinary
 backend selection neither imports nor runs it.
 
 Millipede's browser package now also directly owns the three stable, async, and

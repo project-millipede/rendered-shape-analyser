@@ -5,7 +5,8 @@
 # 2. Build the self-submitting stable GPU-analysis component.
 # 3. Build a JSPI-only async GPU-analysis component.
 # 4. Build the isolated scheduler-owned shared-frame GPU component.
-# 5. Build a full component with WASI 0.3 async proofs for JSPI-capable runtimes.
+# 5. Build the isolated WASI async boundary-proof component for JSPI-capable
+#    runtimes.
 # 6. Lift each core wasm to a component: wit-bindgen already embedded the
 #    component-type metadata, so `component new` needs no adapter.
 #    (If metadata were ever missing, run `wasm-tools component embed wit/ …`
@@ -26,6 +27,8 @@ done
 COMPONENT_BUILD_DIR="${INSPECTOR_COMPONENT_BUILD_DIR:-$PWD/target/component}"
 CARGO_BUILD_DIR="${CARGO_TARGET_DIR:-$PWD/target}"
 CORE_WASM="$CARGO_BUILD_DIR/wasm32-unknown-unknown/release/inspector_component.wasm"
+WASI_ASYNC_BOUNDARY_PROOF_DIR="$COMPONENT_BUILD_DIR/boundary-proofs/wasi-async"
+WASI_ASYNC_BOUNDARY_PROOF_COMPONENT="$WASI_ASYNC_BOUNDARY_PROOF_DIR/inspector-component.wasm"
 
 CARGO_BUILD_ARGS=(
   --locked
@@ -36,13 +39,13 @@ CARGO_BUILD_ARGS=(
   --no-default-features
 )
 
-mkdir -p "$COMPONENT_BUILD_DIR"
+mkdir -p "$COMPONENT_BUILD_DIR" "$WASI_ASYNC_BOUNDARY_PROOF_DIR"
 rm -f \
   "$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm" \
   "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis.wasm" \
   "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-async.wasm" \
   "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm" \
-  "$COMPONENT_BUILD_DIR/inspector-component.wasi-0.3.wasm"
+  "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"
 
 cargo build "${CARGO_BUILD_ARGS[@]}"
 wasm-tools component new \
@@ -67,7 +70,7 @@ wasm-tools component new \
 cargo build "${CARGO_BUILD_ARGS[@]}" --features wasi-async-proofs
 wasm-tools component new \
   "$CORE_WASM" \
-  -o "$COMPONENT_BUILD_DIR/inspector-component.wasi-0.3.wasm"
+  -o "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"
 
 echo "--- analysis world (browser-safe; verify: no wasi:* imports) ---"
 wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm"
@@ -81,5 +84,5 @@ wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-
 echo "--- gpu-analysis-frame world (verify: no encoder finish or gpu-queue submit import) ---"
 wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm"
 
-echo "--- wasi-0.3 proof world (JSPI-only in browsers; verify: no wasi:* imports) ---"
-wasm-tools component wit "$COMPONENT_BUILD_DIR/inspector-component.wasi-0.3.wasm"
+echo "--- wasi-async boundary-proof world (JSPI-only; verify: host-log import only) ---"
+wasm-tools component wit "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT"

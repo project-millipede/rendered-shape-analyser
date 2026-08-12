@@ -1,5 +1,5 @@
-import type * as WasiAsyncProofsModule from "../../../pkg/generated/wasi-0.3/inspector-component";
-import { requireGeneratedCapability } from "./shared";
+import type * as WasiAsyncProofsModule from "../../../../pkg/generated/boundary-proofs/wasi-async/inspector-component";
+import { requireGeneratedCapability } from "../../providers/shared";
 
 type RawWasiAsyncProofsInterface = typeof WasiAsyncProofsModule.wasiAsyncProofs;
 
@@ -35,7 +35,7 @@ const adaptWasiAsyncProofs = (
  */
 export async function instantiateWasiAsyncProofsComponent(): Promise<WasiAsyncProofsInterface> {
   const module =
-    await import("../../../pkg/generated/wasi-0.3/inspector-component");
+    await import("../../../../pkg/generated/boundary-proofs/wasi-async/inspector-component");
   const capability = adaptWasiAsyncProofs(module.wasiAsyncProofs);
   return requireGeneratedCapability(
     capability,

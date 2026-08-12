@@ -192,13 +192,13 @@ initialization before publishing callable world exports.
 Every generated execution world owns independent core instances and its own
 table. There is no cross-variant union table:
 
-| Generated world      | Current forwarding-table slots |
-| -------------------- | -----------------------------: |
-| `analysis`           |                              2 |
-| `gpu-analysis`       |                             12 |
-| `gpu-analysis-async` |                             20 |
-| `gpu-analysis-frame` |                              9 |
-| `wasi-0.3`           |                              7 |
+| Generated world              | Current forwarding-table slots |
+| ---------------------------- | -----------------------------: |
+| `analysis`                   |                              2 |
+| `gpu-analysis`               |                             12 |
+| `gpu-analysis-async`         |                             20 |
+| `gpu-analysis-frame`         |                              9 |
+| `boundary-proofs/wasi-async` |                              6 |
 
 Evaluating the frame binding therefore creates only the frame table. If a page
 prepares multiple variants, each generated instance receives a different

@@ -17,7 +17,7 @@ ANALYSIS_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.analysis.wasm"
 GPU_ANALYSIS_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis.wasm"
 GPU_ANALYSIS_ASYNC_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-async.wasm"
 GPU_ANALYSIS_FRAME_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.gpu-analysis-frame.wasm"
-WASI_COMPONENT="$COMPONENT_BUILD_DIR/inspector-component.wasi-0.3.wasm"
+WASI_ASYNC_BOUNDARY_PROOF_COMPONENT="$COMPONENT_BUILD_DIR/boundary-proofs/wasi-async/inspector-component.wasm"
 
 if [ "$GENERATED_DIR" = "/" ] || [ "$GENERATED_DIR" = "$PWD" ]; then
   echo "error: refusing unsafe generated output directory: $GENERATED_DIR" >&2
@@ -29,7 +29,7 @@ if [ ! -f "$PWD/package.json" ]; then
   exit 1
 fi
 
-if [ ! -f "$ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_ASYNC_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_FRAME_COMPONENT" ] || [ ! -f "$WASI_COMPONENT" ]; then
+if [ ! -f "$ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_ASYNC_COMPONENT" ] || [ ! -f "$GPU_ANALYSIS_FRAME_COMPONENT" ] || [ ! -f "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT" ]; then
   echo "error: component artifacts missing; run npm run build first" >&2
   exit 1
 fi
@@ -44,9 +44,9 @@ ANALYSIS_STAGING_DIR="$STAGING_GENERATED_DIR/analysis"
 GPU_ANALYSIS_STAGING_DIR="$STAGING_GENERATED_DIR/gpu-analysis"
 GPU_ANALYSIS_ASYNC_STAGING_DIR="$STAGING_GENERATED_DIR/gpu-analysis-async"
 GPU_ANALYSIS_FRAME_STAGING_DIR="$STAGING_GENERATED_DIR/gpu-analysis-frame"
-WASI_STAGING_DIR="$STAGING_GENERATED_DIR/wasi-0.3"
+WASI_ASYNC_BOUNDARY_PROOF_STAGING_DIR="$STAGING_GENERATED_DIR/boundary-proofs/wasi-async"
 
-mkdir -p "$ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_ASYNC_STAGING_DIR" "$GPU_ANALYSIS_FRAME_STAGING_DIR" "$WASI_STAGING_DIR"
+mkdir -p "$ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_STAGING_DIR" "$GPU_ANALYSIS_ASYNC_STAGING_DIR" "$GPU_ANALYSIS_FRAME_STAGING_DIR" "$WASI_ASYNC_BOUNDARY_PROOF_STAGING_DIR"
 
 npx jco transpile "$ANALYSIS_COMPONENT" \
   -o "$ANALYSIS_STAGING_DIR" \
@@ -91,11 +91,10 @@ npx jco transpile "$GPU_ANALYSIS_FRAME_COMPONENT" \
 # is detected from WIT, but exported `future<T>`/`stream<T>` functions also
 # need to be named here so their wasm calls are wrapped with
 # WebAssembly.promising instead of the sync path.
-npx jco transpile "$WASI_COMPONENT" \
-  -o "$WASI_STAGING_DIR" \
+npx jco transpile "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT" \
+  -o "$WASI_ASYNC_BOUNDARY_PROOF_STAGING_DIR" \
   --name inspector-component \
-  --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
-  --map 'millipede:inspector/host-events@0.1.0=../../../component-loader/dist/host/events.js' \
+  --map 'millipede:inspector/host-log@0.1.0=../../../../component-loader/dist/host/log.js' \
   --async-mode jspi \
   --async-exports \
     'millipede:inspector/wasi-async-proofs@0.1.0#prove-future' \
@@ -112,6 +111,6 @@ mv "$STAGING_GENERATED_DIR" "$GENERATED_DIR"
 npm run loader:build
 
 echo "--- synced to $GENERATED_DIR ---"
-find "$GENERATED_DIR" -maxdepth 2 -type f | sort
+find "$GENERATED_DIR" -type f | sort
 echo "note: in the website repo, refresh pnpm's file: snapshot with:"
 echo "  pnpm add -w @millipede/inspector-component@file:../../../Reverse-Engineering/Frida/Source-Code-Org/Wasm/inspector-component"

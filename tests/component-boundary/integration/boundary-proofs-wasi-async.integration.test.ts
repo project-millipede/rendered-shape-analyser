@@ -9,16 +9,16 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
-  loadWasiModule,
-  type WasiModuleExports,
+  loadWasiAsyncBoundaryProofModule,
+  type WasiAsyncBoundaryProofExports,
 } from "../support/generated-components.js";
 import { readUtf8Stream } from "../support/read-utf8-stream.js";
 
-describe("generated WASI 0.3 async proof component", () => {
-  let wasiAsyncProofs: WasiModuleExports;
+describe("generated WASI async boundary-proof component", () => {
+  let wasiAsyncProofs: WasiAsyncBoundaryProofExports;
 
   beforeAll(async () => {
-    ({ wasiAsyncProofs } = await loadWasiModule());
+    ({ wasiAsyncProofs } = await loadWasiAsyncBoundaryProofModule());
   });
 
   it("[P10] projects WIT async functions to Promise results", () => {

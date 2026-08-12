@@ -1,4 +1,4 @@
-//! Implementation of the WIT `wasi-async-proofs` export.
+//! Implementation of the WIT `wasi-async-proofs` boundary-proof export.
 
 use super::bindings::{
     FutureReader, Level, StreamReader, WasiAsyncProofsGuest, log, start_task, wit_future,
@@ -28,11 +28,13 @@ fn future_u32(value: u32) -> FutureReader<u32> {
         match writer.write(value).await {
             Ok(()) => log(
                 Level::Info,
-                &format!("[wasi-0.3] future proof completed {value}"),
+                &format!("[boundary-proofs/wasi-async] future proof completed {value}"),
             ),
             Err(_) => log(
                 Level::Warn,
-                &format!("[wasi-0.3] future proof dropped before host received {value}"),
+                &format!(
+                    "[boundary-proofs/wasi-async] future proof dropped before host received {value}"
+                ),
             ),
         }
     });
@@ -61,13 +63,13 @@ fn stream_u8(bytes: Vec<u8>) -> StreamReader<u8> {
         if remaining.is_empty() {
             log(
                 Level::Info,
-                &format!("[wasi-0.3] stream proof completed {byte_len} bytes"),
+                &format!("[boundary-proofs/wasi-async] stream proof completed {byte_len} bytes"),
             );
         } else {
             log(
                 Level::Warn,
                 &format!(
-                    "[wasi-0.3] stream proof dropped with {} of {byte_len} bytes unsent",
+                    "[boundary-proofs/wasi-async] stream proof dropped with {} of {byte_len} bytes unsent",
                     remaining.len()
                 ),
             );
@@ -77,47 +79,50 @@ fn stream_u8(bytes: Vec<u8>) -> StreamReader<u8> {
 }
 
 impl WasiAsyncProofsGuest for Component {
-    /// Prove WIT `async func`; see `wit/wasi-async-proofs.wit`.
+    /// Prove WIT `async func`; see `wit/boundary-proofs-wasi-async.wit`.
     async fn prove_async_func(value: u32) -> u32 {
         install_panic_hook();
         log(
             Level::Info,
-            &format!("[wasi-0.3] async-func proof received {value}"),
+            &format!("[boundary-proofs/wasi-async] async-func proof received {value}"),
         );
         let result = value + 1;
         log(
             Level::Info,
-            &format!("[wasi-0.3] async-func proof returning {result}"),
+            &format!("[boundary-proofs/wasi-async] async-func proof returning {result}"),
         );
         result
     }
 
-    /// Prove WIT `future<T>`; see `wit/wasi-async-proofs.wit`.
+    /// Prove WIT `future<T>`; see `wit/boundary-proofs-wasi-async.wit`.
     fn prove_future(value: u32) -> FutureReader<u32> {
         install_panic_hook();
         log(
             Level::Info,
-            &format!("[wasi-0.3] future proof received {value}"),
+            &format!("[boundary-proofs/wasi-async] future proof received {value}"),
         );
         let result = value + 2;
         log(
             Level::Info,
-            &format!("[wasi-0.3] future proof returning {result}"),
+            &format!("[boundary-proofs/wasi-async] future proof returning {result}"),
         );
         future_u32(result)
     }
 
-    /// Prove WIT `stream<T>`; see `wit/wasi-async-proofs.wit`.
+    /// Prove WIT `stream<T>`; see `wit/boundary-proofs-wasi-async.wit`.
     fn prove_stream(label: String) -> StreamReader<u8> {
         install_panic_hook();
         log(
             Level::Info,
-            &format!("[wasi-0.3] stream proof received {label}"),
+            &format!("[boundary-proofs/wasi-async] stream proof received {label}"),
         );
         let bytes = format!("stream:{label}").into_bytes();
         log(
             Level::Info,
-            &format!("[wasi-0.3] stream proof returning {} bytes", bytes.len()),
+            &format!(
+                "[boundary-proofs/wasi-async] stream proof returning {} bytes",
+                bytes.len()
+            ),
         );
         stream_u8(bytes)
     }

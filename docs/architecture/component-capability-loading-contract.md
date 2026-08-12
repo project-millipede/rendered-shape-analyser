@@ -43,9 +43,9 @@ through browser-owned lazy, selected-variant adapters.
 | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | The root package entry exports types only                                                               | `surface-inspector-browser` owns three explicit device-local adapter modules                                        |
 | `/analysis`, `/gpu-analysis`, `/gpu-analysis-async`, and `/gpu-analysis-frame` isolate runtime families | Selecting a backend dynamically imports only its exact stable, async, or shared-frame adapter                       |
-| `providers/*.ts` privately adapt the matching generated world                                           | Each adapter imports the matching component subpath and calls that loader's one-shot `prepare()`                    |
+| A private adapter colocated with its capability adapts each generated world                             | Each adapter imports the matching component subpath and calls that loader's one-shot `prepare()`                    |
 | Typed loaders return `ready`, `unsupported`, or `failed`                                                | Device-generation preparation preserves those outcomes and retires ready adapters independently                     |
-| `/diagnostics` is a side-effect-free WASI proof entry separate from analyzer entries                    | The explicit browser `/diagnostics` export remains outside ordinary backend selection                               |
+| `/boundary-proofs/wasi-async` is a side-effect-free proof entry separate from analyzer entries          | The explicit browser `/boundary-proofs` export remains outside ordinary backend selection                           |
 | `ready` provides the post-preparation measurement boundary                                              | Invocation and measurement eligibility begins only after selected preparation reports `ready`                       |
 | Stable and frame summary resolvers are invocation-local options                                         | Each call passes its device adapter's resolver; no module-global resolver or mutable backend registry is configured |
 
@@ -60,9 +60,10 @@ Each adapter continues to accept the optional component invocation observer so
 a future session composition can supply it without changing the component
 contract. The current application supplies no observer.
 
-The `/diagnostics` split isolates the explicit WASI async proofs. It does not
-separate GPU summary readback from the stable, async, or frame analyzer
-capabilities; those variants retain their current summary ownership contracts.
+The `/boundary-proofs/wasi-async` split isolates the explicit WASI async
+proofs. It does not separate GPU summary readback from the stable, async, or
+frame analyzer capabilities; those variants retain their current summary
+ownership contracts.
 
 ## Responsibility boundary
 
@@ -271,13 +272,13 @@ state.
 The root `@millipede/inspector-component` entry exports shared types only.
 Runtime code imports exactly one selected subpath:
 
-| Package subpath       | Loader                            | Operation on `ready.capability`                          |
-| --------------------- | --------------------------------- | -------------------------------------------------------- |
-| `/analysis`           | `analysisComponentLoader`         | `analyzeTree(nodes, textureWidth, textureHeight)`        |
-| `/gpu-analysis`       | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |
-| `/gpu-analysis-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |
-| `/gpu-analysis-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |
-| `/diagnostics`        | `wasiAsyncProofsComponentLoader`  | Explicit WASI async proof calls                          |
+| Package subpath               | Loader                            | Operation on `ready.capability`                          |
+| ----------------------------- | --------------------------------- | -------------------------------------------------------- |
+| `/analysis`                   | `analysisComponentLoader`         | `analyzeTree(nodes, textureWidth, textureHeight)`        |
+| `/gpu-analysis`               | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         |
+| `/gpu-analysis-async`         | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          |
+| `/gpu-analysis-frame`         | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` |
+| `/boundary-proofs/wasi-async` | `wasiAsyncProofsComponentLoader`  | Explicit WASI async proof calls                          |
 
 Stable and frame summary resolvers are invocation-local dependencies. They are
 never installed in module-global state.
@@ -314,12 +315,12 @@ operations after `encode()` returns.
 11. A missing deployment artifact, broken import, or instantiation error is
     `failed`, not `unsupported`.
 12. Failures are not silently converted into a cached `null`.
-13. Importing a variant or diagnostic entrypoint performs no workload.
+13. Importing a variant or boundary-proof entrypoint performs no workload.
 14. The loader does not expose its private component provider to callers.
 15. The public loader exposes only `state` and `prepare()`; GPU and session
     retirement remain the responsibility of their actual owners.
-16. `/diagnostics` isolates explicit WASI async proofs, not GPU summary
-    readback performed by analyzer capabilities.
+16. `/boundary-proofs/wasi-async` isolates explicit WASI async proofs, not GPU
+    summary readback performed by analyzer capabilities.
 17. Before transfer, projection or validation failure independently attempts
     destruction of every component-created renderer and summary buffer; one
     cleanup failure does not prevent the remaining attempts.
@@ -374,8 +375,9 @@ paths where destructive work can actually occur.
 
 Each local runtime subpath represents one selected capability family, and the
 root entry is type-only. Private generated-world imports are split across
-`component-loader/src/providers/*.ts`; no singular shared provider adapter
-makes every world reachable. Millipede performs consumer-side selection through
+matching capability adapters; production adapters remain under `providers/`
+and the WASI proof adapter is colocated under `boundary-proofs/wasi-async/`.
+No singular shared provider adapter makes every world reachable. Millipede performs consumer-side selection through
 three explicit lazy adapter modules in `surface-inspector-browser`; each imports
 only its exact component runtime subpath. No wrapper package or mutable backend
 registry makes all variants reachable. P2 still owns the final discovery
@@ -386,8 +388,8 @@ The selected runtime path must satisfy:
 
 - only the selected variant entry is requested and evaluated;
 - unselected GPU variants are not imported as side effects;
-- diagnostic and proof worlds are not requested, evaluated, or instantiated
-  in the selected runtime path unless explicitly selected;
+- boundary-proof worlds are not requested, evaluated, or instantiated in the
+  selected runtime path unless explicitly selected;
 - importing the entrypoint does not register or execute a workload;
 - component preparation happens only through `prepare()`;
 - execution after `ready` performs no additional component loading;
@@ -401,7 +403,7 @@ provider.
 
 Future C1/V1 acceptance must load the final deployed consumer in Chromium and
 record the browser's actual requests. That evidence proves that the selected
-entry loads, no unselected or diagnostic world is requested, and no further
+entry loads, no unselected or boundary-proof world is requested, and no further
 component loading occurs during execution after `ready`. That browser evidence
 is the authoritative selection-isolation gate.
 
@@ -446,11 +448,11 @@ After `ready`, measurement may cover:
 The selected provider and its toolchain version remain run provenance. They are
 not timing metrics.
 
-## Self-tests and diagnostics
+## Boundary proofs
 
-Self-tests are explicit diagnostics, not production bootstrap behavior.
+Boundary proofs are explicit operations, not production bootstrap behavior.
 
-A diagnostic entrypoint must:
+A boundary-proof entrypoint must:
 
 1. be side-effect-free when imported;
 2. require explicit preparation and an explicit proof operation;
@@ -461,7 +463,7 @@ A diagnostic entrypoint must:
 
 A normal application activation must not automatically load or run the
 browser-safe analysis proof or the WASI async proof. Millipede exposes its
-explicit bridge at `@millipede/surface-inspector-browser/diagnostics`; its
+explicit bridge at `@millipede/surface-inspector-browser/boundary-proofs`; its
 ordinary selected-backend imports do not reference that bridge.
 
 ## Private provider replacement
@@ -508,7 +510,7 @@ supported and pass the same capability tests.
 | Frame failure ownership | A throwing `encode()` causes the scheduler to abandon the encoder/frame  |
 | Variant isolation       | C1/V1: Chromium requests only the selected deployed runtime variant      |
 | Measurement integrity   | No measurement event or clock read occurs before `ready`                 |
-| Explicit diagnostics    | Self-tests run only through an explicit diagnostic call                  |
+| Explicit boundary proof | Proofs run only through an explicit boundary-proof call                  |
 | Provider replaceability | Provider conformance tests depend only on normalized capability behavior |
 
 These tests must not assert the private provider's internal module count or

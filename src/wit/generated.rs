@@ -72,7 +72,7 @@ mod raw {
     });
 }
 
-/// wit-bindgen output for the full world, including WASI 0.3 async proofs.
+/// wit-bindgen output for the isolated WASI async boundary-proof world.
 ///
 /// Generated code is exempt from the documentation standard; the public
 /// contract is documented in `wit/` and forwarded into these
@@ -87,7 +87,7 @@ mod raw {
 mod raw {
     wit_bindgen::generate!({
         path: "wit",
-        world: "inspector-component",
+        world: "inspector-boundary-proofs-wasi-async",
     });
 }
 

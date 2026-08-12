@@ -1,4 +1,4 @@
-//! WASI async-proof-owned view over the generated WIT bindings.
+//! WASI async boundary-proof-owned view over the generated WIT bindings.
 
 pub(crate) use crate::wit::generated::exports::millipede::inspector::wasi_async_proofs::Guest as WasiAsyncProofsGuest;
 pub(crate) use crate::wit::generated::millipede::inspector::host_log::{Level, log};

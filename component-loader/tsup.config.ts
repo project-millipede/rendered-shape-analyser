@@ -1,6 +1,15 @@
 import { defineConfig, type Options } from "tsup";
 
-const generatedRuntimePrefix = "../../../pkg/generated/";
+const generatedRuntimePathMappings = [
+  {
+    sourcePrefix: "../../../pkg/generated/",
+    outputPrefix: "../../pkg/generated/",
+  },
+  {
+    sourcePrefix: "../../../../pkg/generated/",
+    outputPrefix: "../../../pkg/generated/",
+  },
+] as const;
 const generatedRuntimeSuffix = "/inspector-component";
 
 /**
@@ -32,18 +41,21 @@ function createGeneratedRuntimeModulePluginOptions(): Pick<
         setup(build) {
           build.onResolve(
             {
-              filter:
-                /^\.\.\/\.\.\/\.\.\/pkg\/generated\/[^/]+\/inspector-component$/,
+              filter: /pkg\/generated\/.+\/inspector-component$/,
             },
             (args) => {
-              const world = args.path.slice(
-                generatedRuntimePrefix.length,
+              const mapping = generatedRuntimePathMappings.find(
+                ({ sourcePrefix }) => args.path.startsWith(sourcePrefix),
+              );
+              if (!mapping) return;
+              const worldPath = args.path.slice(
+                mapping.sourcePrefix.length,
                 -generatedRuntimeSuffix.length,
               );
-              if (!world) return;
+              if (!worldPath) return;
               return {
                 external: true,
-                path: `../../pkg/generated/${world}/inspector-component.js`,
+                path: `${mapping.outputPrefix}${worldPath}${generatedRuntimeSuffix}.js`,
               };
             },
           );
@@ -64,7 +76,8 @@ export default defineConfig({
     "gpu-analysis": "component-loader/src/gpu-analysis.ts",
     "gpu-analysis-async": "component-loader/src/gpu-analysis-async.ts",
     "gpu-analysis-frame": "component-loader/src/gpu-analysis-frame.ts",
-    diagnostics: "component-loader/src/diagnostics.ts",
+    "boundary-proofs/wasi-async":
+      "component-loader/src/boundary-proofs/wasi-async/entry.ts",
     "host/events": "component-loader/src/host/events.ts",
     "host/log": "component-loader/src/host/log.ts",
     "host/webgpu": "component-loader/src/host/webgpu/index.ts",

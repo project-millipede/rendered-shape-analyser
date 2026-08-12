@@ -57,14 +57,3 @@ world inspector-gpu-analysis-frame {
 
   export gpu-analysis-frame;
 }
-
-/// The component's full surface: what it needs from the website host
-/// (logging, event push) and what it offers (the real analysis interface plus
-/// the isolated WASI 0.3 async proof harness).
-world inspector-component {
-  import host-log;
-  import host-events;
-
-  export analysis;
-  export wasi-async-proofs;
-}

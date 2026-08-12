@@ -3,6 +3,5 @@
 /// Runtime helpers shared by component interface implementations.
 pub(crate) mod runtime;
 
-/// The component — implements the `analysis` interface of the
-/// `inspector-component` world.
+/// Guest implementation type for the selected component world.
 pub(crate) struct Component;
