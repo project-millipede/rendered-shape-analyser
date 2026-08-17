@@ -17,6 +17,37 @@ interface GpuLaneOutput {
   indirectBuffer: object;
 }
 
+export type AnalysisValidationErrorKind =
+  | "invalid-request"
+  | "texture-mismatch"
+  | "truth-buffer-too-small";
+
+export interface AnalysisValidationError {
+  kind: AnalysisValidationErrorKind;
+  message: string;
+}
+
+/** Shared generated outcome shape used by every product GPU world. */
+export type GpuAnalysisOutcome<Success> =
+  | {
+      tag: "success";
+      val: Success;
+    }
+  | {
+      tag: "validation-error";
+      val: AnalysisValidationError;
+    };
+
+/** Require the successful value in generated-world happy-path tests. */
+export function unwrapGpuAnalysisSuccess<Success>(
+  outcome: GpuAnalysisOutcome<Success>,
+): Success {
+  if (outcome.tag === "success") return outcome.val;
+  throw new Error(
+    `expected GPU analysis success, received ${outcome.val.kind}: ${outcome.val.message}`,
+  );
+}
+
 export interface StableGpuDispatch {
   summary: SummaryReadbackDescriptor;
   visual: GpuLaneOutput;
@@ -58,7 +89,7 @@ export interface StableGpuModuleExports {
     texture: unknown,
     truthBuffer: unknown,
     request: AnalysisRequest,
-  ): StableGpuDispatch;
+  ): GpuAnalysisOutcome<StableGpuDispatch>;
 }
 
 interface StableGpuModule {
@@ -71,7 +102,7 @@ export interface AsyncGpuModuleExports {
     texture: unknown,
     truthBuffer: unknown,
     request: AnalysisRequest,
-  ): Promise<AsyncGpuDispatch>;
+  ): Promise<GpuAnalysisOutcome<AsyncGpuDispatch>>;
 }
 
 interface AsyncGpuModule {
@@ -85,7 +116,7 @@ export interface FrameGpuModuleExports {
     texture: unknown,
     truthBuffer: unknown,
     request: AnalysisRequest,
-  ): FrameGpuDispatch;
+  ): GpuAnalysisOutcome<FrameGpuDispatch>;
 }
 
 interface FrameGpuModule {

@@ -2,8 +2,10 @@
  * Generated GPU adapter validation and lifecycle proof.
  *
  * One undersized component-reference buffer reaches the final resource check
- * through each retained public GPU world. The cases prove that validation traps
- * before observable analyzer preparation or command ownership begins; the
+ * through each retained public GPU world. The stable case also covers the two
+ * earlier preflight categories once, avoiding per-world duplication while
+ * proving the shared classifier's complete public mapping. Every world then
+ * invokes the same generated instance with a valid fixture successfully. The
  * shared-frame case additionally snapshots its borrowed scheduler encoder to
  * prove that no modeled field changed.
  *
@@ -25,7 +27,6 @@ import {
   capturedTestGpuBufferUnmaps,
   capturedTestGpuMappedRangeCopies,
 } from "../../../target/component-tests/host/gpu.js";
-import { capturedLogLines } from "../../../target/component-tests/host/log.js";
 import {
   requireTestGpuCommandEncoder,
   type CommandEncoderRecord,
@@ -40,13 +41,31 @@ import {
   loadFrameGpuModule,
   loadStableGpuModule,
   type AsyncGpuModuleExports,
+  type AnalysisValidationErrorKind,
   type FrameGpuModuleExports,
+  type GpuAnalysisOutcome,
   type StableGpuModuleExports,
+  unwrapGpuAnalysisSuccess,
 } from "../support/generated-components.js";
 import {
   createGpuTestContext,
   type FakeCommandEncoderHandle,
 } from "../support/gpu-test-context.js";
+
+function expectedValidationOutcome(
+  kind: AnalysisValidationErrorKind,
+  message: string,
+): GpuAnalysisOutcome<never> {
+  return {
+    tag: "validation-error",
+    val: { kind, message },
+  };
+}
+
+const EXPECTED_TRUTH_BUFFER_VALIDATION_OUTCOME = expectedValidationOutcome(
+  "truth-buffer-too-small",
+  "ground-truth buffer is smaller than declared node count",
+);
 
 /**
  * Assert only the analyzer preparation and lifecycle observations captured by
@@ -68,25 +87,11 @@ function expectNoObservedAnalyzerWorkStarted(): void {
 }
 
 /**
- * Confirm that the intended adapter-specific validation branch produced the
- * trap rather than an earlier metadata or texture failure.
- *
- * @param fragment - Distinguishing text expected in one captured error log.
- */
-function expectGroundTruthValidationLog(fragment: string): void {
-  expect(
-    capturedLogLines.some(
-      ({ lvl, msg }) => lvl === "error" && msg.includes(fragment),
-    ),
-  ).toBe(true);
-}
-
-/**
  * Snapshot every modeled field of the scheduler-owned encoder.
  *
  * The dispatch array is cloned because the registered encoder record remains
  * mutable while a component call runs. Comparing snapshots therefore proves
- * that a rejected shared-frame call did not append commands or change any
+ * that a shared-frame validation error did not append commands or change any
  * modeled lifecycle/resource field.
  *
  * @param encoder - Borrowed fake encoder whose state must remain unchanged.
@@ -113,66 +118,142 @@ describe("generated GPU validation boundaries", () => {
     ({ gpuAnalysisFrame } = await loadFrameGpuModule());
   });
 
-  it("[P10] leaves a borrowed encoder untouched when final validation fails", () => {
+  it("[P10] recovers frame validation with an untouched encoder and reusable instance", () => {
     // The zero-byte truth buffer passes request and texture validation, then
     // reaches the final truth-buffer branch. The assertions below cover the
     // host-observed workload effects and the borrowed encoder itself.
-    const context = createGpuTestContext({ referenceBufferSize: 0 });
-    const encoder = context.deviceHandle.createCommandEncoder({
+    const invalidContext = createGpuTestContext({ referenceBufferSize: 0 });
+    const invalidEncoder = invalidContext.deviceHandle.createCommandEncoder({
       label: "invalid shared-frame test encoder",
     });
-    const encoderBefore = snapshotEncoder(encoder);
+    const encoderBefore = snapshotEncoder(invalidEncoder);
 
-    expect(() =>
-      gpuAnalysisFrame.encode(
-        encoder,
-        context.deviceHandle,
-        context.textureHandle,
-        context.bufferHandle,
-        FRAME_ANALYSIS_REQUEST,
-      ),
-    ).toThrow(WebAssembly.RuntimeError);
+    const invalidOutcome = gpuAnalysisFrame.encode(
+      invalidEncoder,
+      invalidContext.deviceHandle,
+      invalidContext.textureHandle,
+      invalidContext.bufferHandle,
+      FRAME_ANALYSIS_REQUEST,
+    );
 
-    const encoderAfter = snapshotEncoder(encoder);
+    expect(invalidOutcome).toEqual(EXPECTED_TRUTH_BUFFER_VALIDATION_OUTCOME);
+
+    const encoderAfter = snapshotEncoder(invalidEncoder);
     expect(encoderAfter.computePassBegins).toBe(0);
     expect(encoderAfter.computePassEnds).toBe(0);
     expect(encoderAfter.computePassOpen).toBe(false);
     expect(encoderAfter).toEqual(encoderBefore);
-    expectGroundTruthValidationLog("invalid shared-frame ground-truth buffer");
     expectNoObservedAnalyzerWorkStarted();
+
+    const validContext = createGpuTestContext();
+    const validEncoder = validContext.deviceHandle.createCommandEncoder({
+      label: "valid shared-frame recovery encoder",
+    });
+    const validOutcome = gpuAnalysisFrame.encode(
+      validEncoder,
+      validContext.deviceHandle,
+      validContext.textureHandle,
+      validContext.bufferHandle,
+      FRAME_ANALYSIS_REQUEST,
+    );
+    unwrapGpuAnalysisSuccess(validOutcome);
+
+    expect(snapshotEncoder(validEncoder).computePassBegins).toBe(1);
   });
 
-  it("[P8] traps stable truth-buffer validation without observed lifecycle effects", () => {
-    const context = createGpuTestContext({ referenceBufferSize: 0 });
+  it("[P8] classifies stable preflight errors and reuses the same instance", () => {
+    // 1. `invalid-request` wins when request, texture, and truth buffer are
+    // all invalid.
+    const invalidRequestContext = createGpuTestContext({
+      referenceBufferSize: 0,
+    });
+    const invalidRequestOutcome = gpuAnalysis.analyze(
+      invalidRequestContext.deviceHandle,
+      invalidRequestContext.textureHandle,
+      invalidRequestContext.bufferHandle,
+      {
+        ...STABLE_ANALYSIS_REQUEST,
+        entryId: "",
+        textureWidth: STABLE_ANALYSIS_REQUEST.textureWidth + 1,
+      },
+    );
 
-    expect(() =>
-      gpuAnalysis.analyze(
-        context.deviceHandle,
-        context.textureHandle,
-        context.bufferHandle,
-        STABLE_ANALYSIS_REQUEST,
-      ),
-    ).toThrow(WebAssembly.RuntimeError);
-
-    expectGroundTruthValidationLog("invalid ground-truth buffer");
-    expectNoObservedAnalyzerWorkStarted();
-  });
-
-  it("[P8] rejects async truth-buffer validation without observed lifecycle effects", async () => {
-    const context = createGpuTestContext({ referenceBufferSize: 0 });
-
-    await expect(
-      gpuAnalysisAsync.analyze(
-        context.deviceHandle,
-        context.textureHandle,
-        context.bufferHandle,
-        ASYNC_ANALYSIS_REQUEST,
-      ),
-    ).rejects.toBeInstanceOf(WebAssembly.RuntimeError);
-
-    expectGroundTruthValidationLog(
-      "invalid async GPU analysis ground-truth buffer",
+    expect(invalidRequestOutcome).toEqual(
+      expectedValidationOutcome("invalid-request", "entry id is empty"),
     );
     expectNoObservedAnalyzerWorkStarted();
+
+    // 2. `texture-mismatch` wins when request metadata is valid but the
+    // texture and truth buffer are both invalid.
+    const textureMismatchContext = createGpuTestContext({
+      referenceBufferSize: 0,
+    });
+    const textureMismatchOutcome = gpuAnalysis.analyze(
+      textureMismatchContext.deviceHandle,
+      textureMismatchContext.textureHandle,
+      textureMismatchContext.bufferHandle,
+      {
+        ...STABLE_ANALYSIS_REQUEST,
+        textureWidth: STABLE_ANALYSIS_REQUEST.textureWidth + 1,
+      },
+    );
+
+    expect(textureMismatchOutcome).toEqual(
+      expectedValidationOutcome(
+        "texture-mismatch",
+        "texture dimensions do not match upstream gpu-texture",
+      ),
+    );
+    expectNoObservedAnalyzerWorkStarted();
+
+    // 3. `truth-buffer-too-small` is selected when request metadata and the
+    // borrowed texture are valid.
+    const invalidContext = createGpuTestContext({ referenceBufferSize: 0 });
+
+    const invalidOutcome = gpuAnalysis.analyze(
+      invalidContext.deviceHandle,
+      invalidContext.textureHandle,
+      invalidContext.bufferHandle,
+      STABLE_ANALYSIS_REQUEST,
+    );
+
+    expect(invalidOutcome).toEqual(EXPECTED_TRUTH_BUFFER_VALIDATION_OUTCOME);
+    expectNoObservedAnalyzerWorkStarted();
+
+    const validContext = createGpuTestContext();
+    const validOutcome = gpuAnalysis.analyze(
+      validContext.deviceHandle,
+      validContext.textureHandle,
+      validContext.bufferHandle,
+      STABLE_ANALYSIS_REQUEST,
+    );
+    unwrapGpuAnalysisSuccess(validOutcome);
+
+    expect(capturedGpuCommandSubmits).toHaveLength(1);
+  });
+
+  it("[P8] recovers async validation and accepts a valid call on the same instance", async () => {
+    const invalidContext = createGpuTestContext({ referenceBufferSize: 0 });
+
+    const invalidOutcome = await gpuAnalysisAsync.analyze(
+      invalidContext.deviceHandle,
+      invalidContext.textureHandle,
+      invalidContext.bufferHandle,
+      ASYNC_ANALYSIS_REQUEST,
+    );
+
+    expect(invalidOutcome).toEqual(EXPECTED_TRUTH_BUFFER_VALIDATION_OUTCOME);
+    expectNoObservedAnalyzerWorkStarted();
+
+    const validContext = createGpuTestContext();
+    const validOutcome = await gpuAnalysisAsync.analyze(
+      validContext.deviceHandle,
+      validContext.textureHandle,
+      validContext.bufferHandle,
+      ASYNC_ANALYSIS_REQUEST,
+    );
+    unwrapGpuAnalysisSuccess(validOutcome);
+
+    expect(capturedGpuCommandSubmits).toHaveLength(1);
   });
 });

@@ -1,16 +1,15 @@
 //! Implementation of the WIT `gpu-analysis-async` export.
 
 use super::bindings::{
-    AnalysisDispatch, AnalysisResult, GpuAnalysisAsyncGuest, GpuBuffer, GpuDevice, GpuTexture,
-    Level, log,
+    AnalysisDispatch, AnalysisOutcome, AnalysisResult, GpuAnalysisAsyncGuest, GpuBuffer, GpuDevice,
+    GpuTexture, Level, log,
 };
 use super::summary::read_diagnostic_summary;
 use super::webgpu::{await_submitted_work, pop_validation_scope, push_validation_scope};
 use crate::gpu_shared::{
     create_analysis_border_trace_output, create_analysis_visual_output,
     create_edge_discovery_output, project_diagnostic_plan, project_discovery_plan,
-    submit_compatibility_dispatch, validate_compatibility_request, validate_texture,
-    validate_truth_buffer,
+    submit_compatibility_dispatch, validate_analysis_preflight,
 };
 use crate::shared::Component;
 use crate::shared::runtime::install_panic_hook;
@@ -22,21 +21,18 @@ impl GpuAnalysisAsyncGuest for Component {
         texture: &GpuTexture,
         truth_buffer: &GpuBuffer,
         request: AnalysisDispatch,
-    ) -> AnalysisResult {
+    ) -> AnalysisOutcome {
         install_panic_hook();
 
-        if let Err(message) = validate_compatibility_request(&request) {
-            fail(format!("invalid async GPU analysis request: {message}"));
-        }
-        if let Err(message) =
-            validate_texture(texture, request.texture_width, request.texture_height)
-        {
-            fail(format!("invalid async GPU analysis texture: {message}"));
-        }
-        if let Err(message) = validate_truth_buffer(truth_buffer, request.node_count) {
-            fail(format!(
-                "invalid async GPU analysis ground-truth buffer: {message}"
-            ));
+        if let Err(error) = validate_analysis_preflight(texture, truth_buffer, &request) {
+            log(
+                Level::Warn,
+                &format!(
+                    "[component-gpu-async] preflight validation failed: {}",
+                    error.message
+                ),
+            );
+            return AnalysisOutcome::ValidationError(error);
         }
 
         let diagnostic_plan = project_diagnostic_plan(&request);
@@ -104,12 +100,12 @@ impl GpuAnalysisAsyncGuest for Component {
             discovery_resources.output.frequency_indirect,
         );
 
-        AnalysisResult {
+        AnalysisOutcome::Success(AnalysisResult {
             summary,
             visual,
             border_trace,
             edge_discovery,
-        }
+        })
     }
 }
 
@@ -117,8 +113,8 @@ impl GpuAnalysisAsyncGuest for Component {
 ///
 /// 1. Keeps the async WIT surface away from `result<large-record, string>`
 ///    until that JSPI lowering shape is stable for this analyzer output.
-/// 2. Still gives the browser caller the same failed `await analyze(...)`
-///    behavior it expects for stale work, validation failures, and device loss.
+/// 2. Still gives the browser caller the failed `await analyze(...)` behavior
+///    required for post-allocation failures and device loss.
 ///
 /// # Arguments
 ///

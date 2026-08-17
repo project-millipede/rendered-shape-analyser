@@ -8,6 +8,10 @@ import type {
   ComponentGpuAnalysisInvocationEvent,
   ComponentGpuAnalysisObserver,
 } from "../../../component-loader/src/gpu-analysis-observer.js";
+import {
+  ComponentGpuAnalysisValidationError,
+  unwrapComponentGpuAnalysisOutcome,
+} from "../../../component-loader/src/gpu-analysis-validation-error.js";
 import type {
   AnalysisSummaryResult,
   ComponentGpuAnalysisInput,
@@ -47,6 +51,36 @@ const createOutput = (
     edgeDiscovery: { buffer, indirectBuffer: buffer },
   };
 };
+
+describe("authored GPU validation outcome", () => {
+  it("[P10] unwraps success and exposes a typed recoverable error", () => {
+    const success = { value: "prepared output" } as const;
+
+    expect(
+      unwrapComponentGpuAnalysisOutcome({ tag: "success", val: success }),
+    ).toBe(success);
+
+    let caught: unknown;
+    try {
+      unwrapComponentGpuAnalysisOutcome({
+        tag: "validation-error",
+        val: {
+          kind: "truth-buffer-too-small",
+          message: "ground-truth buffer is smaller than declared node count",
+        },
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ComponentGpuAnalysisValidationError);
+    expect(caught).toMatchObject({
+      name: "ComponentGpuAnalysisValidationError",
+      kind: "truth-buffer-too-small",
+      message: "ground-truth buffer is smaller than declared node count",
+    });
+  });
+});
 
 describe("authored stable GPU capability", () => {
   it("[P10] performs provider work once and routes each call-local resolver", async () => {

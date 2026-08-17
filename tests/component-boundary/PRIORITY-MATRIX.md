@@ -15,20 +15,20 @@ code rather than additional test categories.
 
 ### `gpu-stable.integration.test.ts`
 
-| Priority | Protected R2 behavior                                                             |
-| -------: | --------------------------------------------------------------------------------- |
-|       10 | Stable analysis returns the exact public readback plan and summary byte boundary. |
-|       10 | Stable recording order and finish/submit ownership remain exact.                  |
-|        8 | Caller device, texture, and buffer identity survives every stable phase.          |
-|        7 | All six renderer-facing stable handles preserve opaque identity.                  |
-|        6 | Every stable pipeline and lane is created on the caller's device.                 |
-|        5 | Stable indirect arguments remain separate GPU-only draw records.                  |
+| Priority | Protected R2 behavior                                                            |
+| -------: | -------------------------------------------------------------------------------- |
+|       10 | Stable success returns the exact public readback plan and summary byte boundary. |
+|       10 | Stable recording order and finish/submit ownership remain exact.                 |
+|        8 | Caller device, texture, and buffer identity survives every stable phase.         |
+|        7 | All six renderer-facing stable handles preserve opaque identity.                 |
+|        6 | Every stable pipeline and lane is created on the caller's device.                |
+|        5 | Stable indirect arguments remain separate GPU-only draw records.                 |
 
 ### `gpu-async.integration.test.ts`
 
 | Priority | Protected R2 behavior                                            |
 | -------: | ---------------------------------------------------------------- |
-|       10 | Async analysis returns the exact Rust-decoded summary.           |
+|       10 | Async success returns the exact Rust-decoded summary.            |
 |        9 | Rust maps, copies, and unmaps the exact 72-byte summary range.   |
 |        8 | Async owns exactly one complete encoding and submission.         |
 |        7 | All six renderer-facing async handles preserve opaque identity.  |
@@ -41,18 +41,18 @@ code rather than additional test categories.
 | -------: | ---------------------------------------------------------------------------------- |
 |       10 | The borrowed scheduler encoder is neither finished nor submitted by the component. |
 |       10 | Compatibility opens and closes exactly one compute pass.                           |
-|        9 | Shared-frame returns the exact plan and summary byte length.                       |
+|        9 | Shared-frame success returns the exact plan and summary byte length.               |
 |        9 | All six renderer-facing frame handles preserve opaque identity.                    |
 |        7 | Recording prepares every R2-A workload lane.                                       |
 |        6 | The scheduler can later finish and submit the same borrowed encoder.               |
 
 ### `gpu-validation.integration.test.ts`
 
-| Priority | Protected R2 behavior                                                                                                                             |
-| -------: | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-|       10 | Final validation failure leaves the borrowed shared-frame encoder completely untouched.                                                           |
-|        8 | Stable reaches the intended truth-buffer branch, then traps without captured pipeline/output, finish/submission, resolution, or mapping effects.  |
-|        8 | Async reaches the intended truth-buffer branch, then rejects without captured pipeline/output, finish/submission, resolution, or mapping effects. |
+| Priority | Protected R2 behavior                                                                                                                   |
+| -------: | --------------------------------------------------------------------------------------------------------------------------------------- |
+|       10 | Raw generated frame returns the exact truth-buffer error, leaves its encoder untouched, then accepts a valid call on the same instance. |
+|        8 | Raw generated stable classifies all three categories without analyzer effects, then accepts a valid call on the same instance.          |
+|        8 | Raw generated async resolves that error without analyzer effects, then accepts a valid call on the same instance.                       |
 
 ### `boundary-proofs-wasi-async.integration.test.ts`
 
@@ -93,6 +93,7 @@ boundary-proof entry neither owns nor replaces them.
 
 | Priority | Protected authored-capability behavior                                                     |
 | -------: | ------------------------------------------------------------------------------------------ |
+|       10 | The shared structural outcome normalizer maps success or throws a typed validation error.  |
 |       10 | Preparation occurs once while each stable call receives its own summary resolver.          |
 |       10 | Shared-frame invocation stays synchronous and preserves exact output identity.             |
 |       10 | Every shared-frame throw requires scheduler abandonment without append, finish, or submit. |
@@ -132,9 +133,10 @@ boundary-proof entry neither owns nor replaces them.
 2. Every generated GPU world retains its own workload-preparation proof.
    Stable and async additionally protect caller-device ownership and indirect-
    buffer shape; shared-frame protects its borrowed-encoder lifecycle.
-3. Generated integration uses one final truth-buffer validation failure per
-   public variant. Rust unit tests own pure metadata cases, their precedence,
-   and metadata error strings.
+3. Generated integration covers all three preflight categories once through
+   stable, plus the final truth-buffer category and one subsequent valid call
+   through every public variant. Rust unit tests own the remaining pure
+   metadata cases, their precedence, and error strings.
 4. Capability state-machine tests are pure transition-table tests. Module-wide
    loader tests separately inject support and instantiation operations to prove
    its one-shot Promise and settled outcomes without generated output.

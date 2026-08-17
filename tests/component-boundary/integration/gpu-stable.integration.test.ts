@@ -34,6 +34,7 @@ import {
   loadStableGpuModule,
   type StableGpuDispatch,
   type StableGpuModuleExports,
+  unwrapGpuAnalysisSuccess,
 } from "../support/generated-components.js";
 import {
   createGpuTestContext,
@@ -51,12 +52,13 @@ describe("generated stable GPU component", () => {
 
   beforeEach(async () => {
     context = createGpuTestContext();
-    dispatch = gpuAnalysis.analyze(
+    const outcome = gpuAnalysis.analyze(
       context.deviceHandle,
       context.textureHandle,
       context.bufferHandle,
       STABLE_ANALYSIS_REQUEST,
     );
+    dispatch = unwrapGpuAnalysisSuccess(outcome);
     await resolveTestAnalysisSummaryReadback(
       context.deviceHandle,
       dispatch.summary,

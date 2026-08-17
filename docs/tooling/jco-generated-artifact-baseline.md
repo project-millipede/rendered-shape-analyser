@@ -1,6 +1,6 @@
 # JCO transpilation and generated Wasm artifact baseline
 
-> **Status:** Current implementation reference, recorded 2026-08-11
+> **Status:** Current implementation reference, recorded 2026-08-17
 >
 > **Scope:** Browser artifact generation, generated-file roles, and toolchain
 > provenance
@@ -25,7 +25,7 @@ For provider-neutral readiness and lifecycle behavior, see the
 | `wit-bindgen`           | 0.60.0                      | Guest bindings and Component Model metadata                                          |
 | `wasm-tools`            | 1.251.0                     | Component lifting and world verification                                             |
 | `wkg`                   | 0.16.0                      | WIT dependency fetch and validation                                                  |
-| `@bytecodealliance/jco` | 1.28.1 resolved             | CLI used to transpile existing components                                            |
+| `@bytecodealliance/jco` | 1.29.0 resolved             | CLI used to transpile existing components                                            |
 | Node                    | 24.15.0                     | Generated-component test runtime, including JSPI support                             |
 | WIT package             | `millipede:inspector@0.1.0` | Versioned project interfaces                                                         |
 | WIT dependency          | `wasi:webgpu@0.0.1`         | Upstream GPU resource interface, currently supplied through the local `wkg` override |
@@ -218,7 +218,7 @@ Async tables also contain generated runtime machinery such as waitable polling
 and task/future/stream operations. Table entries must therefore be described as
 trampoline functions rather than exclusively as calls into the authored host.
 
-These names and counts record JCO 1.28.1. They are not stable contracts.
+These names and counts record JCO 1.29.0. They are not stable contracts.
 Another generator version, provider, or native browser Component Model
 implementation may use a different representation.
 

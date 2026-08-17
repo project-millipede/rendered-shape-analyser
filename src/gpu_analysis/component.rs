@@ -1,14 +1,14 @@
 //! Implementation of the WIT `gpu-analysis` export.
 
 use super::bindings::{
-    AnalysisDispatch, AnalysisDispatchResult, GpuAnalysisGuest, GpuBuffer, GpuDevice, GpuTexture,
-    Level, log,
+    AnalysisDispatch, AnalysisDispatchResult, AnalysisOutcome, GpuAnalysisGuest, GpuBuffer,
+    GpuDevice, GpuTexture, Level, log,
 };
 use crate::gpu_shared::{
     build_compatibility_metadata, create_analysis_border_trace_output,
     create_analysis_summary_readback, create_analysis_visual_output, create_edge_discovery_output,
     project_diagnostic_plan, project_discovery_plan, submit_compatibility_dispatch,
-    validate_compatibility_request, validate_texture, validate_truth_buffer,
+    validate_analysis_preflight,
 };
 use crate::shared::Component;
 use crate::shared::runtime::install_panic_hook;
@@ -20,31 +20,18 @@ impl GpuAnalysisGuest for Component {
         texture: &GpuTexture,
         truth_buffer: &GpuBuffer,
         request: AnalysisDispatch,
-    ) -> AnalysisDispatchResult {
+    ) -> AnalysisOutcome {
         install_panic_hook();
 
-        if let Err(message) = validate_compatibility_request(&request) {
+        if let Err(error) = validate_analysis_preflight(texture, truth_buffer, &request) {
             log(
-                Level::Error,
-                &format!("[component-gpu] invalid analysis request: {message}"),
+                Level::Warn,
+                &format!(
+                    "[component-gpu] preflight validation failed: {}",
+                    error.message
+                ),
             );
-            panic!("invalid GPU analysis request: {message}");
-        }
-        if let Err(message) =
-            validate_texture(texture, request.texture_width, request.texture_height)
-        {
-            log(
-                Level::Error,
-                &format!("[component-gpu] invalid analysis texture: {message}"),
-            );
-            panic!("invalid GPU analysis texture: {message}");
-        }
-        if let Err(message) = validate_truth_buffer(truth_buffer, request.node_count) {
-            log(
-                Level::Error,
-                &format!("[component-gpu] invalid ground-truth buffer: {message}"),
-            );
-            panic!("invalid GPU analysis ground-truth buffer: {message}");
+            return AnalysisOutcome::ValidationError(error);
         }
 
         let diagnostic_plan = project_diagnostic_plan(&request);
@@ -93,11 +80,11 @@ impl GpuAnalysisGuest for Component {
             discovery_resources.output.frequency_indirect,
         );
 
-        AnalysisDispatchResult {
+        AnalysisOutcome::Success(AnalysisDispatchResult {
             summary,
             visual,
             border_trace,
             edge_discovery,
-        }
+        })
     }
 }

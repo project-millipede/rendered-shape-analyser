@@ -7,6 +7,7 @@ import {
   type ComponentGpuAnalysisFrameCapability,
 } from "./gpu-analysis-frame-capability";
 import { createComponentGpuAnalysisDispatch } from "./gpu-analysis-dispatch";
+import { unwrapComponentGpuAnalysisOutcome } from "./gpu-analysis-validation-error";
 import {
   type ComponentGpuOutputHandles,
   destroyUntransferredSummaryBuffers,
@@ -114,14 +115,16 @@ const encodeWithPreparedComponent = (
   let edgeDiscovery: ComponentGpuAnalysisEdgeDiscoveryOutput | null = null;
 
   try {
-    result = frameInterface.encode(
+    const outcome = frameInterface.encode(
       encoderHandle,
       deviceHandle,
       textureHandle,
       truthHandle,
       createComponentGpuAnalysisDispatch(input),
     );
-    const { summary: encodedSummary, ...encodedOutputHandles } = result;
+    const encodedResult = unwrapComponentGpuAnalysisOutcome(outcome);
+    result = encodedResult;
+    const { summary: encodedSummary, ...encodedOutputHandles } = encodedResult;
     outputHandles = encodedOutputHandles;
 
     // Taking the projection consumes its registry identity, proves that Rust
@@ -281,3 +284,7 @@ export type {
   ComponentCapabilityState,
   ComponentUnsupportedReason,
 } from "./capability";
+export {
+  ComponentGpuAnalysisValidationError,
+  type ComponentGpuAnalysisValidationErrorKind,
+} from "./gpu-analysis-validation-error";
