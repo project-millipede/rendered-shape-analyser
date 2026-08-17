@@ -10,6 +10,7 @@ interface gpu-analysis-frame {
     analysis-dispatch,
     analysis-edge-discovery-output,
     analysis-plan,
+    analysis-validation-error,
     analysis-visual-output,
   };
   use wasi:webgpu/webgpu@0.0.1.{
@@ -44,6 +45,14 @@ interface gpu-analysis-frame {
     edge-discovery: analysis-edge-discovery-output,
   }
 
+  /// Recoverable outcome of one scheduler-owned frame invocation.
+  variant encode-outcome {
+    /// Analysis commands and outputs were encoded successfully.
+    success(encoded-analysis-frame),
+    /// Preflight validation failed before the borrowed encoder was changed.
+    validation-error(analysis-validation-error),
+  }
+
   /// Append one analyzer dispatch to the browser scheduler's command encoder.
   ///
   /// # Critical scheduler-ownership invariant
@@ -65,5 +74,5 @@ interface gpu-analysis-frame {
     texture: borrow<gpu-texture>,
     truth-buffer: borrow<gpu-buffer>,
     request: analysis-dispatch,
-  ) -> encoded-analysis-frame;
+  ) -> encode-outcome;
 }

@@ -34,6 +34,7 @@ import {
   loadAsyncGpuModule,
   type AsyncGpuDispatch,
   type AsyncGpuModuleExports,
+  unwrapGpuAnalysisSuccess,
 } from "../support/generated-components.js";
 import {
   createGpuTestContext,
@@ -51,12 +52,13 @@ describe("generated async GPU component", () => {
 
   beforeEach(async () => {
     context = createGpuTestContext();
-    dispatch = await gpuAnalysisAsync.analyze(
+    const outcome = await gpuAnalysisAsync.analyze(
       context.deviceHandle,
       context.textureHandle,
       context.bufferHandle,
       ASYNC_ANALYSIS_REQUEST,
     );
+    dispatch = unwrapGpuAnalysisSuccess(outcome);
   });
 
   it("[P10] returns the exact Rust-decoded public summary", () => {

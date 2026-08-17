@@ -30,16 +30,33 @@ const output = await prepared.capability.analyze(input, { summaryResolver });
 A selected subpath owns one module-wide loader. Its only lifecycle operation is
 one-shot `prepare()`; `state` is a read-only observation. Concurrent and later
 calls share the same Promise and result. Their public TypeScript contracts are
-read-only; they do not rely on runtime freezing. `ready` means the selected
-capability is callable and its later operations perform no import, download,
-compilation, instantiation, or self-test. `unsupported` and `failed` remain
-distinct settled outcomes for that imported module URL.
+read-only; they do not rely on runtime freezing. `ready` means preparation
+produced a callable capability and its operations require no later import,
+download, compilation, instantiation, or self-test. It is a settled preparation
+outcome, not a dynamic post-invocation health signal. `unsupported` and `failed`
+remain distinct settled outcomes for that imported module URL.
 
 There is deliberately no `retry()` or loader `dispose()`. Browsers may cache a
 failed ESM evaluation for one URL, while the current private provider has no
 real component-unload operation. Navigation or a newly versioned module URL is
 the reset boundary. GPU-device generations, invocation-local resolvers, pending
 summaries, and output buffers retain their own explicit lifetimes.
+
+Guest preflight validation is invocation-local and does not change that loader
+state. The private generated worlds return `success | validation-error`; the
+selected authored subpath unwraps `success` and surfaces validation through
+`ComponentGpuAnalysisValidationError`, with a stable `kind` and `message`.
+Stable and async calls reject with that error, while frame encoding throws it
+synchronously before changing the borrowed encoder. Public capability return
+types therefore remain success-only, and the same ready capability remains
+usable by a later valid call; frame recovery uses a fresh frame and encoder.
+The alternatives considered and the reason this implementation selects the
+stronger tagged-outcome guarantee are recorded under
+[choosing the preflight failure policy](../docs/architecture/component-instance-failure-and-recovery.md#choosing-the-preflight-failure-policy).
+
+Unexpected component traps are a separate terminal-instance concern. The
+current limitation and possible replacement boundaries are recorded in
+[Component instance failure and recovery](../docs/architecture/component-instance-failure-and-recovery.md).
 
 ## Where it fits
 
@@ -85,12 +102,12 @@ pending, and P2 still owns the final discovery/session/resource topology.
 
 ## Choose an execution mode
 
-| Package subpath / Millipede mode              | Loader                            | Ready-capability operation                               | Requirement         |
-| --------------------------------------------- | --------------------------------- | -------------------------------------------------------- | ------------------- |
-| `/gpu-analysis` / `component-gpu`             | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         | WebGPU; no JSPI     |
-| `/gpu-analysis-frame` / `component-gpu-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` | WebGPU; no JSPI     |
-| `/gpu-analysis-async` / `component-gpu-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          | WebGPU plus JSPI    |
-| `/boundary-proofs/wasi-async`                 | `wasiAsyncProofsComponentLoader`  | `proveAsyncFunc()`, `proveFuture()`, or `proveStream()`  | JSPI                |
+| Package subpath / Millipede mode              | Loader                            | Ready-capability operation                               | Requirement      |
+| --------------------------------------------- | --------------------------------- | -------------------------------------------------------- | ---------------- |
+| `/gpu-analysis` / `component-gpu`             | `componentGpuAnalyzerLoader`      | `analyze(input, { summaryResolver, observer? })`         | WebGPU; no JSPI  |
+| `/gpu-analysis-frame` / `component-gpu-frame` | `componentGpuFrameAnalyzerLoader` | `encode(input, encoder, { summaryResolver, observer? })` | WebGPU; no JSPI  |
+| `/gpu-analysis-async` / `component-gpu-async` | `componentGpuAnalyzerAsyncLoader` | `analyze(input, { observer? })`                          | WebGPU plus JSPI |
+| `/boundary-proofs/wasi-async`                 | `wasiAsyncProofsComponentLoader`  | `proveAsyncFunc()`, `proveFuture()`, or `proveStream()`  | JSPI             |
 
 `/boundary-proofs/wasi-async` is only the isolated WASI async projection
 proof. It is not a home for GPU diagnostics and does not remove GPU summary
@@ -156,11 +173,13 @@ The scheduler later finishes and submits that same encoder, then calls
 `encoded.summary.resolveAfterSubmit(...)`. If the frame is abandoned and can
 never be submitted, it calls `encoded.summary.dispose()` instead.
 
-If `encode()` throws, commands may already have been appended to the borrowed
-native encoder. The scheduler must abandon that entire encoder/frame and must
-not append more commands, finish, or submit it. Invocation cleanup releases
-the temporary WIT projection and component-owned buffers; it cannot roll back
-the native command stream or make the encoder reusable.
+A `ComponentGpuAnalysisValidationError` proves that guest command recording did
+not begin and leaves the borrowed encoder untouched. The current authored frame
+contract nevertheless remains conservative: every `encode()` throw makes the
+scheduler abandon that encoder/frame. Other throws may already follow native
+command recording, which cannot be rolled back. Invocation cleanup releases the
+temporary WIT projection and component-owned buffers; it does not make a
+partially recorded encoder reusable.
 
 All GPU modes accept caller-owned browser resources from one `GPUDevice`.
 Successful results keep visual, border-trace, and edge-discovery buffers and
@@ -234,31 +253,32 @@ because one consumer is the async backend.
 
 ## Source map
 
-| Source                                  | Responsibility                                                                     |
-| --------------------------------------- | ---------------------------------------------------------------------------------- |
-| `src/index.ts`                          | Shared type-only package root                                                      |
-| `src/gpu-analysis.ts`                   | Stable authored capability and `componentGpuAnalyzerLoader`                        |
-| `src/gpu-analysis-async.ts`             | Async authored capability and `componentGpuAnalyzerAsyncLoader`                    |
-| `src/gpu-analysis-frame.ts`             | Synchronous borrowed-frame capability and `componentGpuFrameAnalyzerLoader`        |
-| `src/gpu-analysis-async-capability.ts`  | Private JSPI invocation wrapper and observer boundary                              |
-| `src/gpu-analysis-frame-capability.ts`  | Private synchronous frame wrapper and mandatory throw/abandon boundary             |
-| `src/boundary-proofs/wasi-async/`       | Isolated WASI async-proof entry and generated-provider adapter                     |
-| `src/capability-state.ts`               | Pure one-shot preparation states, triggers, and legal transition function          |
-| `src/capability.ts`                     | Prepare-only module loader, typed outcomes, and shared Promise ownership           |
-| `src/errors.ts`                         | No-throw normalization for provider and observer diagnostics                       |
-| `src/support-webassembly.ts`            | Baseline WebAssembly gate for non-JSPI variants                                    |
-| `src/support-jspi.ts`                   | Exact JSPI gate used only by async GPU and isolated-proof variants                 |
-| `src/providers/*.ts`                    | Private production-world adapters from generated exports to authored capabilities  |
-| `src/gpu-analysis-dispatch.ts`          | Variant-neutral request metadata construction                                      |
-| `src/gpu-analysis-runtime.ts`           | Stable/async call-local registration, output transfer, and cleanup                 |
-| `src/gpu-analysis-observer.ts`          | Optional provider-neutral post-readiness invocation observations                   |
-| `src/host/gpu-types.ts`                 | Shared request, result, submission, and summary-resolver contracts                 |
-| `src/host/gpu-output-set.ts`            | Canonical renderer-output ownership shape and exhaustive traversal                 |
-| `src/host/gpu-output.ts`                | Variant-neutral plan validation and native output translation                      |
-| `src/host/gpu-summary-stable.ts`        | Stable-world compact-summary ownership transfer                                    |
-| `src/host/gpu-summary-frame.ts`         | Shared-frame pending-summary lifecycle                                             |
-| `src/host/webgpu/`                      | Browser implementation and temporary registry for imported `wasi:webgpu` resources |
-| `src/host/log.ts`                       | Guest logging import                                                               |
+| Source                                 | Responsibility                                                                     |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `src/index.ts`                         | Shared type-only package root                                                      |
+| `src/gpu-analysis.ts`                  | Stable authored capability and `componentGpuAnalyzerLoader`                        |
+| `src/gpu-analysis-async.ts`            | Async authored capability and `componentGpuAnalyzerAsyncLoader`                    |
+| `src/gpu-analysis-frame.ts`            | Synchronous borrowed-frame capability and `componentGpuFrameAnalyzerLoader`        |
+| `src/gpu-analysis-async-capability.ts` | Private JSPI invocation wrapper and observer boundary                              |
+| `src/gpu-analysis-frame-capability.ts` | Private synchronous frame wrapper and mandatory throw/abandon boundary             |
+| `src/boundary-proofs/wasi-async/`      | Isolated WASI async-proof entry and generated-provider adapter                     |
+| `src/capability-state.ts`              | Pure one-shot preparation states, triggers, and legal transition function          |
+| `src/capability.ts`                    | Prepare-only module loader, typed outcomes, and shared Promise ownership           |
+| `src/errors.ts`                        | No-throw normalization for provider and observer diagnostics                       |
+| `src/support-webassembly.ts`           | Baseline WebAssembly gate for non-JSPI variants                                    |
+| `src/support-jspi.ts`                  | Exact JSPI gate used only by async GPU and isolated-proof variants                 |
+| `src/providers/*.ts`                   | Private production-world adapters from generated exports to authored capabilities  |
+| `src/gpu-analysis-dispatch.ts`         | Variant-neutral request metadata construction                                      |
+| `src/gpu-analysis-runtime.ts`          | Stable/async call-local registration, output transfer, and cleanup                 |
+| `src/gpu-analysis-validation-error.ts` | Authored recoverable preflight error and private generated-outcome unwrapping      |
+| `src/gpu-analysis-observer.ts`         | Optional provider-neutral post-readiness invocation observations                   |
+| `src/host/gpu-types.ts`                | Shared request, result, submission, and summary-resolver contracts                 |
+| `src/host/gpu-output-set.ts`           | Canonical renderer-output ownership shape and exhaustive traversal                 |
+| `src/host/gpu-output.ts`               | Variant-neutral plan validation and native output translation                      |
+| `src/host/gpu-summary-stable.ts`       | Stable-world compact-summary ownership transfer                                    |
+| `src/host/gpu-summary-frame.ts`        | Shared-frame pending-summary lifecycle                                             |
+| `src/host/webgpu/`                     | Browser implementation and temporary registry for imported `wasi:webgpu` resources |
+| `src/host/log.ts`                      | Guest logging import                                                               |
 
 For deeper contracts, see the [project README](../README.md), the
 [component-boundary test guide](../tests/component-boundary/README.md), and the

@@ -28,6 +28,7 @@ import {
   loadFrameGpuModule,
   type FrameGpuDispatch,
   type FrameGpuModuleExports,
+  unwrapGpuAnalysisSuccess,
 } from "../support/generated-components.js";
 import {
   createGpuTestContext,
@@ -50,13 +51,14 @@ describe("generated shared-frame GPU component", () => {
     frameEncoder = context.deviceHandle.createCommandEncoder({
       label: "scheduler-owned test frame encoder",
     });
-    dispatch = gpuAnalysisFrame.encode(
+    const outcome = gpuAnalysisFrame.encode(
       frameEncoder,
       context.deviceHandle,
       context.textureHandle,
       context.bufferHandle,
       FRAME_ANALYSIS_REQUEST,
     );
+    dispatch = unwrapGpuAnalysisSuccess(outcome);
   });
 
   it("[P10] neither finishes nor submits the borrowed encoder", () => {

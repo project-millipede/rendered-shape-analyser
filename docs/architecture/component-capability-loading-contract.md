@@ -2,7 +2,7 @@
 
 > - **Status:** Direct local variant capabilities and explicit Millipede
 >   consumer adoption implemented
-> - **Last reviewed:** 2026-08-11
+> - **Last reviewed:** 2026-08-17
 > - **Applies to:** Browser component loading and capability readiness
 > - **Roadmap context:** H1 measurement prerequisite; final topology remains
 >   owned by R2-C and P2
@@ -10,6 +10,8 @@
 >   R2-C package/API naming
 > - **Related evidence:**
 >   [Real-browser WebGPU lifetime testing](../testing/browser-lifetime/README.md)
+> - **Post-ready failure follow-up:**
+>   [Component instance failure and recovery](component-instance-failure-and-recovery.md)
 > - **Compute prerequisite:**
 >   [GPU compute execution contract](gpu-compute-execution-contract.md)
 
@@ -260,17 +262,20 @@ is `state-unchanged` and reuses the retained Promise.
 
 `analyze()`, async analysis, and shared-frame `encode()` are deliberately not
 transition triggers. They require a ready capability but do not mutate loader
-state.
+state. Post-ready instance health and terminal-trap retirement are separate
+from preparation state and are recorded in the
+[component instance failure and recovery](component-instance-failure-and-recovery.md)
+follow-up.
 
 ### State meanings
 
-| State         | Meaning                                                                         |
-| ------------- | ------------------------------------------------------------------------------- |
-| `idle`        | No preparation attempt has started                                              |
-| `preparing`   | The private provider is preparing the selected component                        |
-| `ready`       | The selected component is callable and no loading remains in its execution path |
-| `unsupported` | The environment lacks a required declared capability                            |
-| `failed`      | Preparation failed unexpectedly                                                 |
+| State         | Meaning                                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| `idle`        | No preparation attempt has started                                                                       |
+| `preparing`   | The private provider is preparing the selected component                                                 |
+| `ready`       | Preparation produced a callable capability; no loading remains, but later instance health is not tracked |
+| `unsupported` | The environment lacks a required declared capability                                                     |
+| `failed`      | Preparation failed unexpectedly                                                                          |
 
 ## Variant-specific public capabilities
 

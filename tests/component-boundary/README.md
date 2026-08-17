@@ -106,7 +106,10 @@ registries while the test reset a second source-host instance.
 Vitest uses one worker, disables file parallelism and module isolation, and
 runs tests non-concurrently. `support/vitest-setup.ts` resets all observations
 and resource registries before each test, spies on guest logging, and restores
-Vitest mocks afterward. Topic files add only the setup needed by their world.
+Vitest mocks afterward. The validation cases invoke an invalid fixture and a
+valid fixture through the same loaded world inside one test, so a fresh module
+instance cannot hide a failed recovery. Topic files add only the setup needed
+by their world.
 
 The WebGPU host is a typed stateful test double rather than a shallow
 `vi.mock()`: JCO links concrete WIT resource classes at instantiation, so a
@@ -132,34 +135,48 @@ loader `dispose()`. Public-entry singleton identity and selected-world request
 isolation remain entry-level and real-browser acceptance responsibilities.
 
 `component-gpu-authored-capability.test.ts` keeps module preparation separate
-from ordinary invocation. It also proves the shared-frame rule: `encode()` is
+from ordinary invocation and unit-tests the shared structural outcome
+normalizer with success and validation-error fixtures. It does not instantiate
+a generated provider. It also proves the shared-frame rule: `encode()` is
 synchronous, and every throw requires the scheduler to abandon that
 encoder/frame without appending render work, finishing, or submitting. A native
 command stream cannot be rolled back after a partial encode.
 
 ## Validation strategy
 
-`gpu-validation.integration.test.ts` exercises one representative invalid call
-through each retained public GPU world. All three calls use an undersized truth
-buffer, and their adapter-specific logs confirm that request and texture
-validation reached the intended final truth-buffer branch:
+`gpu-validation.integration.test.ts` exercises the complete preflight
+classification once through the stable world, then exercises the final
+truth-buffer category through async and shared-frame. Every invalid call must
+return its exact typed outcome before analyzer work begins:
 
-1. stable must trap without any captured pipeline/output, finish/submission,
-   resolution, or mapping effects;
-2. async must reject without those same captured effects;
-3. shared-frame must trap without beginning a pass or changing its borrowed
-   encoder.
+1. the raw generated stable export returns `invalid-request`,
+   `texture-mismatch`, and
+   `truth-buffer-too-small` in order, then succeeds through the same generated
+   instance;
+2. the raw generated async export resolves the recoverable outcome, then
+   succeeds through the same generated instance;
+3. the raw generated shared-frame export returns the recoverable outcome
+   synchronously without changing its borrowed encoder, then succeeds through
+   the same generated instance.
+
+These assertions describe the raw generated exports. The authored stable and
+async subpaths convert a validation outcome into a rejected Promise, while the
+authored frame subpath throws `ComponentGpuAnalysisValidationError`
+synchronously. Complete generated-provider-to-authored-subpath composition
+remains package and real-browser acceptance responsibility.
 
 That representative validation failure occurs before command recording and
-therefore proves an untouched encoder. It does not weaken the more general
-failure rule: if any later `encode()` step throws after appending commands, the
-scheduler abandons the whole frame and encoder.
+therefore proves an untouched encoder. The shared outcome type and success
+unwrapper live in the existing support module; the expected truth-buffer
+outcome is declared once in the validation spec. This does not weaken the more
+general failure rule: if any later `encode()` step throws after appending
+commands, the scheduler abandons the whole frame and encoder.
 
 Rust unit tests own the pure metadata cases, their exact rule ordering, and
 metadata error strings. The representative resource failure remains at the
 generated boundary. Do not multiply the three component cases by every invalid
-field; they prove each adapter's distinct failure and lifecycle behavior, not
-the pure validation arithmetic again.
+field; they prove each generated world's distinct return and lifecycle
+behavior, not the pure validation arithmetic again.
 
 ## Shared GPU fixture
 

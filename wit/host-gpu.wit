@@ -26,6 +26,24 @@ interface host-gpu {
     node-count: u32,
   }
 
+  /// Caller-correctable validation failure detected before GPU work begins.
+  enum analysis-validation-error-kind {
+    /// Request metadata is incomplete or internally inconsistent.
+    invalid-request,
+    /// Declared texture dimensions do not match the borrowed GPU texture.
+    texture-mismatch,
+    /// The borrowed ground-truth buffer cannot contain the declared nodes.
+    truth-buffer-too-small,
+  }
+
+  /// Recoverable preflight validation failure for one analyzer invocation.
+  record analysis-validation-error {
+    /// Stable machine-readable validation category.
+    kind: analysis-validation-error-kind,
+    /// Human-readable validation detail suitable for diagnostics.
+    message: string,
+  }
+
   /// Analyzer kernel selected by the Rust component.
   ///
   /// New kernels must be added here before the host can dispatch them. This

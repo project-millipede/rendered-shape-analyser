@@ -4,8 +4,16 @@
 /// receives only opaque host resource handles plus dispatch metadata; it does
 /// not receive DOM/CSS/React data or copied pixels.
 interface gpu-analysis {
-  use host-gpu.{analysis-dispatch, analysis-dispatch-result};
+  use host-gpu.{analysis-dispatch, analysis-dispatch-result, analysis-validation-error};
   use wasi:webgpu/webgpu@0.0.1.{gpu-buffer, gpu-device, gpu-texture};
+
+  /// Recoverable outcome of one stable analyzer invocation.
+  variant analysis-outcome {
+    /// Analysis completed and returned its GPU-resident outputs.
+    success(analysis-dispatch-result),
+    /// Preflight validation failed before GPU work began.
+    validation-error(analysis-validation-error),
+  }
 
   /// Start one per-component statistics analysis dispatch.
   ///
@@ -23,5 +31,5 @@ interface gpu-analysis {
     texture: borrow<gpu-texture>,
     truth-buffer: borrow<gpu-buffer>,
     request: analysis-dispatch,
-  ) -> analysis-dispatch-result;
+  ) -> analysis-outcome;
 }
