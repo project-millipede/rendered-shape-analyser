@@ -10,6 +10,7 @@ interface gpu-analysis-frame {
     analysis-dispatch,
     analysis-edge-discovery-output,
     analysis-plan,
+    analysis-validation-error,
     analysis-visual-output,
   };
   use wasi:webgpu/webgpu@0.0.1.{
@@ -65,5 +66,5 @@ interface gpu-analysis-frame {
     texture: borrow<gpu-texture>,
     truth-buffer: borrow<gpu-buffer>,
     request: analysis-dispatch,
-  ) -> encoded-analysis-frame;
+  ) -> result<encoded-analysis-frame, analysis-validation-error>;
 }

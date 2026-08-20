@@ -1,6 +1,6 @@
 # JCO transpilation and generated Wasm artifact baseline
 
-> **Status:** Current implementation reference, recorded 2026-08-11
+> **Status:** Current implementation reference, recorded 2026-08-19
 >
 > **Scope:** Browser artifact generation, generated-file roles, and toolchain
 > provenance
@@ -25,7 +25,7 @@ For provider-neutral readiness and lifecycle behavior, see the
 | `wit-bindgen`           | 0.60.0                      | Guest bindings and Component Model metadata                                          |
 | `wasm-tools`            | 1.251.0                     | Component lifting and world verification                                             |
 | `wkg`                   | 0.16.0                      | WIT dependency fetch and validation                                                  |
-| `@bytecodealliance/jco` | 1.28.1 resolved             | CLI used to transpile existing components                                            |
+| `@bytecodealliance/jco` | 1.30.0 resolved             | CLI used to transpile existing components                                            |
 | Node                    | 24.15.0                     | Generated-component test runtime, including JSPI support                             |
 | WIT package             | `millipede:inspector@0.1.0` | Versioned project interfaces                                                         |
 | WIT dependency          | `wasi:webgpu@0.0.1`         | Upstream GPU resource interface, currently supplied through the local `wkg` override |
@@ -76,14 +76,17 @@ npx jco transpile \
     'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map \
     'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
+  --no-component-error-wrapping \
   --base64-cutoff 0 \
   --no-namespaced-exports
 ```
 
 The mappings connect component imports to the built handwritten browser host.
-Async worlds additionally use JSPI mode and explicit async-export names. The
-zero base64 cutoff keeps every generated core module in an external `.wasm`
-file rather than embedding Wasm bytes into JavaScript.
+Async worlds additionally use JSPI mode and explicit async-export names.
+`--no-component-error-wrapping` makes top-level WIT `result::err` values cross
+the generated synchronous and JSPI boundaries as their directly lifted WIT
+payloads. The zero base64 cutoff keeps every generated core module in an
+external `.wasm` file rather than embedding Wasm bytes into JavaScript.
 
 The root package contains the authored loader output under
 `component-loader/dist/` and current generated-provider payload under
@@ -218,7 +221,7 @@ Async tables also contain generated runtime machinery such as waitable polling
 and task/future/stream operations. Table entries must therefore be described as
 trampoline functions rather than exclusively as calls into the authored host.
 
-These names and counts record JCO 1.28.1. They are not stable contracts.
+These names and counts record JCO 1.30.0. They are not stable contracts.
 Another generator version, provider, or native browser Component Model
 implementation may use a different representation.
 

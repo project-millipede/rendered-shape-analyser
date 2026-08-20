@@ -1,6 +1,8 @@
 //! Workload-specific metadata validation and compatibility composition.
 
-use crate::wit::generated::millipede::inspector::host_gpu::AnalysisDispatch;
+use crate::wit::generated::millipede::inspector::host_gpu::{
+    AnalysisDispatch, AnalysisValidationError, AnalysisValidationErrorKind,
+};
 use crate::wit::generated::wasi::webgpu::webgpu::{GpuBuffer, GpuTexture};
 
 use crate::reference_diagnostics::{GROUND_TRUTH_HEADER_BYTES, GROUND_TRUTH_NODE_BYTES};
@@ -31,8 +33,8 @@ fn validate_nonzero_texture_dimensions(
 ///
 /// # Returns
 ///
-/// `Ok(())` for a non-zero reference count, or the existing diagnostic error
-/// string suitable for logging before trapping.
+/// `Ok(())` for a non-zero reference count, otherwise the stable reason
+/// composed into the public typed preflight error.
 fn validate_diagnostic_reference_count(node_count: u32) -> Result<(), &'static str> {
     if node_count == 0 {
         return Err("ground-truth node count must be non-zero");
@@ -55,9 +57,9 @@ fn validate_diagnostic_reference_count(node_count: u32) -> Result<(), &'static s
 ///
 /// # Returns
 ///
-/// `Ok(())` when the discovery metadata is meaningful, or the existing error
-/// string suitable for logging before trapping.
-pub(crate) fn validate_discovery_metadata(
+/// `Ok(())` when the discovery metadata is meaningful, otherwise the stable
+/// validation reason composed into the public typed preflight error.
+fn validate_discovery_metadata(
     texture_width: u32,
     texture_height: u32,
 ) -> Result<(), &'static str> {
@@ -84,11 +86,9 @@ pub(crate) fn validate_discovery_metadata(
 ///
 /// # Returns
 ///
-/// `Ok(())` when both currently requested workloads are meaningful, or an
-/// error string suitable for logging before trapping.
-pub(crate) fn validate_compatibility_request(
-    request: &AnalysisDispatch,
-) -> Result<(), &'static str> {
+/// `Ok(())` when both currently requested workloads are meaningful, otherwise
+/// the stable reason composed into the public typed preflight error.
+fn validate_compatibility_request(request: &AnalysisDispatch) -> Result<(), &'static str> {
     if request.entry_id.is_empty() {
         return Err("entry id is empty");
     }
@@ -110,9 +110,9 @@ pub(crate) fn validate_compatibility_request(
 ///
 /// # Returns
 ///
-/// `Ok(())` when declared dimensions match the registered texture, or an error
-/// string suitable for logging before trapping.
-pub(crate) fn validate_texture(
+/// `Ok(())` when declared dimensions match the registered texture, otherwise
+/// the stable reason composed into the public typed preflight error.
+fn validate_texture(
     texture: &GpuTexture,
     texture_width: u32,
     texture_height: u32,
@@ -133,12 +133,9 @@ pub(crate) fn validate_texture(
 ///
 /// # Returns
 ///
-/// `Ok(())` when the registered buffer can contain the declared node count, or
-/// an error string suitable for logging before trapping.
-pub(crate) fn validate_truth_buffer(
-    truth_buffer: &GpuBuffer,
-    node_count: u32,
-) -> Result<(), &'static str> {
+/// `Ok(())` when the registered buffer can contain the declared node count,
+/// otherwise the stable reason composed into the public typed preflight error.
+fn validate_truth_buffer(truth_buffer: &GpuBuffer, node_count: u32) -> Result<(), &'static str> {
     let required_bytes =
         GROUND_TRUTH_HEADER_BYTES + u64::from(node_count) * GROUND_TRUTH_NODE_BYTES;
 
@@ -146,6 +143,69 @@ pub(crate) fn validate_truth_buffer(
         return Err("ground-truth buffer is smaller than declared node count");
     }
     Ok(())
+}
+
+/// Validate every recoverable preflight layer in its public precedence order.
+///
+/// The returned error is part of the generated component contract, so callers
+/// can reject malformed input without trapping their component instance. This
+/// function must remain free of GPU planning, allocation, command encoding,
+/// submission, and logging side effects.
+///
+/// # Validation order
+///
+/// 1. Request metadata.
+/// 2. Declared dimensions against the upstream texture.
+/// 3. Declared node count against the upstream truth-buffer capacity.
+///
+/// # Arguments
+///
+/// * `texture` - Captured-pixel texture supplied by the host.
+/// * `truth_buffer` - Component-reference buffer supplied by the host.
+/// * `request` - Dispatch metadata supplied by the browser backend.
+///
+/// # Returns
+///
+/// `Ok(())` when all preflight layers pass, otherwise the first typed
+/// validation error according to the order above.
+pub(crate) fn validate_analysis_preflight(
+    texture: &GpuTexture,
+    truth_buffer: &GpuBuffer,
+    request: &AnalysisDispatch,
+) -> Result<(), AnalysisValidationError> {
+    if let Err(message) = validate_compatibility_request(request) {
+        return Err(analysis_validation_error(
+            AnalysisValidationErrorKind::InvalidRequest,
+            message,
+        ));
+    }
+
+    if let Err(message) = validate_texture(texture, request.texture_width, request.texture_height) {
+        return Err(analysis_validation_error(
+            AnalysisValidationErrorKind::TextureMismatch,
+            message,
+        ));
+    }
+
+    if let Err(message) = validate_truth_buffer(truth_buffer, request.node_count) {
+        return Err(analysis_validation_error(
+            AnalysisValidationErrorKind::TruthBufferTooSmall,
+            message,
+        ));
+    }
+
+    Ok(())
+}
+
+/// Compose one generated validation record without adding logging side effects.
+fn analysis_validation_error(
+    kind: AnalysisValidationErrorKind,
+    message: &str,
+) -> AnalysisValidationError {
+    AnalysisValidationError {
+        kind,
+        message: message.to_string(),
+    }
 }
 
 #[cfg(test)]

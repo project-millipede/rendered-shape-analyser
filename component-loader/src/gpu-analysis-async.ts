@@ -2,11 +2,13 @@ import {
   createComponentCapabilityLoader,
   type ComponentCapabilityLoader,
 } from "./capability";
+import { invokeAsyncComponentOperation } from "./component-invocation";
 import {
   resolveComponentGpuOutputs,
   withComponentGpuAnalysisScope,
 } from "./gpu-analysis-runtime";
 import { createComponentGpuAnalysisDispatch } from "./gpu-analysis-dispatch";
+import { normalizeComponentGpuAnalysisValidationError } from "./gpu-analysis-validation-error";
 import {
   createComponentGpuAnalysisAsyncCapability,
   type ComponentGpuAnalysisAsyncCapability,
@@ -35,11 +37,10 @@ const analyzeWithPreparedComponent = async (
 ): Promise<ComponentGpuAnalysisOutput> =>
   withComponentGpuAnalysisScope(input, async (scope) => {
     const { device, texture, truthBuffer } = scope.inputs;
-    const result = await component.analyze(
-      device,
-      texture,
-      truthBuffer,
-      createComponentGpuAnalysisDispatch(input),
+    const dispatch = createComponentGpuAnalysisDispatch(input);
+    const result = await invokeAsyncComponentOperation(
+      () => component.analyze(device, texture, truthBuffer, dispatch),
+      normalizeComponentGpuAnalysisValidationError,
     );
     const { summary, ...outputHandles } = result;
     const outputs = resolveComponentGpuOutputs(
@@ -96,6 +97,10 @@ export type {
   ComponentGpuAnalysisAsyncCapability,
   ComponentGpuAnalysisAsyncOptions,
 } from "./gpu-analysis-async-capability";
+export {
+  ComponentGpuAnalysisValidationError,
+  type ComponentGpuAnalysisValidationErrorKind,
+} from "./gpu-analysis-validation-error";
 export type {
   ComponentCapabilityLoader,
   ComponentCapabilityPrepareResult,

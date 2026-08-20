@@ -53,6 +53,7 @@ npx jco transpile "$GPU_ANALYSIS_COMPONENT" \
   --name inspector-component \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
+  --no-component-error-wrapping \
   --base64-cutoff 0 \
   --no-namespaced-exports
 
@@ -63,6 +64,7 @@ npx jco transpile "$GPU_ANALYSIS_ASYNC_COMPONENT" \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
   --async-mode jspi \
   --async-exports 'millipede:inspector/gpu-analysis-async@0.1.0#analyze' \
+  --no-component-error-wrapping \
   --base64-cutoff 0 \
   --no-namespaced-exports
 
@@ -71,6 +73,7 @@ npx jco transpile "$GPU_ANALYSIS_FRAME_COMPONENT" \
   --name inspector-component \
   --map 'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map 'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
+  --no-component-error-wrapping \
   --base64-cutoff 0 \
   --no-namespaced-exports
 
@@ -86,6 +89,7 @@ npx jco transpile "$WASI_ASYNC_BOUNDARY_PROOF_COMPONENT" \
   --async-exports \
     'millipede:inspector/wasi-async-proofs@0.1.0#prove-future' \
     'millipede:inspector/wasi-async-proofs@0.1.0#prove-stream' \
+  --no-component-error-wrapping \
   --base64-cutoff 0 \
   --no-namespaced-exports
 
@@ -100,4 +104,4 @@ npm run loader:build
 echo "--- synced to $GENERATED_DIR ---"
 find "$GENERATED_DIR" -type f | sort
 echo "note: in the website repo, refresh pnpm's file: snapshot with:"
-echo "  pnpm add -w @millipede/inspector-component@file:../../../Reverse-Engineering/Frida/Source-Code-Org/Wasm/inspector-component"
+echo "  pnpm --filter @millipede/surface-inspector-browser --fail-if-no-match install --frozen-lockfile --prod=false --no-optimistic-repeat-install"

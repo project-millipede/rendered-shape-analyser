@@ -1,14 +1,13 @@
 //! Implementation of the WIT `gpu-analysis-frame` export.
 
 use super::bindings::{
-    AnalysisDispatch, AnalysisFrameSummary, EncodedAnalysisFrame, GpuAnalysisFrameGuest, GpuBuffer,
-    GpuCommandEncoder, GpuDevice, GpuTexture, Level, log,
+    AnalysisDispatch, AnalysisFrameSummary, AnalysisValidationError, EncodedAnalysisFrame,
+    GpuAnalysisFrameGuest, GpuBuffer, GpuCommandEncoder, GpuDevice, GpuTexture, Level, log,
 };
 use crate::gpu_shared::{
     build_compatibility_metadata, create_analysis_border_trace_output,
     create_analysis_visual_output, create_edge_discovery_output, encode_compatibility_dispatch,
-    project_diagnostic_plan, project_discovery_plan, validate_compatibility_request,
-    validate_texture, validate_truth_buffer,
+    project_diagnostic_plan, project_discovery_plan, validate_analysis_preflight,
 };
 use crate::shared::Component;
 use crate::shared::runtime::install_panic_hook;
@@ -21,21 +20,12 @@ impl GpuAnalysisFrameGuest for Component {
         texture: &GpuTexture,
         truth_buffer: &GpuBuffer,
         request: AnalysisDispatch,
-    ) -> EncodedAnalysisFrame {
+    ) -> Result<EncodedAnalysisFrame, AnalysisValidationError> {
         install_panic_hook();
 
-        if let Err(message) = validate_compatibility_request(&request) {
-            fail(format!("invalid shared-frame analysis request: {message}"));
-        }
-        if let Err(message) =
-            validate_texture(texture, request.texture_width, request.texture_height)
-        {
-            fail(format!("invalid shared-frame analysis texture: {message}"));
-        }
-        if let Err(message) = validate_truth_buffer(truth_buffer, request.node_count) {
-            fail(format!(
-                "invalid shared-frame ground-truth buffer: {message}"
-            ));
+        match validate_analysis_preflight(texture, truth_buffer, &request) {
+            Ok(()) => {}
+            Err(error) => return Err(error),
         }
 
         let diagnostic_plan = project_diagnostic_plan(&request);
@@ -99,17 +89,11 @@ impl GpuAnalysisFrameGuest for Component {
             discovery_resources.output.frequency_indirect,
         );
 
-        EncodedAnalysisFrame {
+        Ok(EncodedAnalysisFrame {
             summary,
             visual,
             border_trace,
             edge_discovery,
-        }
+        })
     }
-}
-
-/// Log and trap one invalid shared-frame call.
-fn fail(message: String) -> ! {
-    log(Level::Error, &format!("[component-gpu-frame] {message}"));
-    panic!("{message}");
 }

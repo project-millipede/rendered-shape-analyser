@@ -30,16 +30,39 @@ const output = await prepared.capability.analyze(input, { summaryResolver });
 A selected subpath owns one module-wide loader. Its only lifecycle operation is
 one-shot `prepare()`; `state` is a read-only observation. Concurrent and later
 calls share the same Promise and result. Their public TypeScript contracts are
-read-only; they do not rely on runtime freezing. `ready` means the selected
-capability is callable and its later operations perform no import, download,
-compilation, instantiation, or self-test. `unsupported` and `failed` remain
-distinct settled outcomes for that imported module URL.
+read-only; they do not rely on runtime freezing. `ready` means preparation
+produced the selected callable capability and its later operations perform no
+import, download, compilation, instantiation, or self-test; it is not a dynamic
+post-invocation health signal. `unsupported` and `failed` remain distinct
+settled outcomes for that imported module URL.
 
 There is deliberately no `retry()` or loader `dispose()`. Browsers may cache a
 failed ESM evaluation for one URL, while the current private provider has no
 real component-unload operation. Navigation or a newly versioned module URL is
 the reset boundary. GPU-device generations, invocation-local resolvers, pending
 summaries, and output buffers retain their own explicit lifetimes.
+
+### Preflight validation errors
+
+Every GPU component export uses a top-level WIT `result`. Success remains the
+bare generated result record; callers do not unwrap a success variant.
+Transpilation uses `--no-component-error-wrapping`, so stable and shared-frame
+throw the raw WIT error record and the async JSPI export rejects with that same
+record.
+
+The exact authored GPU subpaths normalize only a non-`Error` value structurally
+matching that directly lifted record to the exported
+`ComponentGpuAnalysisValidationError`, whose `kind` is
+`invalid-request`, `texture-mismatch`, or `truth-buffer-too-small`. Every other
+thrown value—including every `Error` and `WebAssembly.RuntimeError`—passes
+through unchanged. These preflight failures occur before GPU work, fail only
+that invocation, and leave the same prepared component instance callable for a
+later valid request.
+
+Invocation outcomes do not add states or transitions to the preparation-only
+loader; the separate
+[instance failure and recovery follow-up](../docs/architecture/component-instance-failure-and-recovery.md)
+owns that distinction and possible long-term replacement boundaries.
 
 ## Where it fits
 
@@ -248,9 +271,11 @@ because one consumer is the async backend.
 | `src/errors.ts`                         | No-throw normalization for provider and observer diagnostics                       |
 | `src/support-webassembly.ts`            | Baseline WebAssembly gate for non-JSPI variants                                    |
 | `src/support-jspi.ts`                   | Exact JSPI gate used only by async GPU and isolated-proof variants                 |
+| `src/component-invocation.ts`           | Generic sync/async component-operation error-boundary composition                  |
 | `src/providers/*.ts`                    | Private production-world adapters from generated exports to authored capabilities  |
 | `src/gpu-analysis-dispatch.ts`          | Variant-neutral request metadata construction                                      |
 | `src/gpu-analysis-runtime.ts`           | Stable/async call-local registration, output transfer, and cleanup                 |
+| `src/gpu-analysis-validation-error.ts`  | Authored preflight error and raw WIT validation-record normalization               |
 | `src/gpu-analysis-observer.ts`          | Optional provider-neutral post-readiness invocation observations                   |
 | `src/host/gpu-types.ts`                 | Shared request, result, submission, and summary-resolver contracts                 |
 | `src/host/gpu-output-set.ts`            | Canonical renderer-output ownership shape and exhaustive traversal                 |

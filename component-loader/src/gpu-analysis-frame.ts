@@ -2,11 +2,13 @@ import {
   createComponentCapabilityLoader,
   type ComponentCapabilityLoader,
 } from "./capability";
+import { invokeComponentOperation } from "./component-invocation";
 import {
   createComponentGpuAnalysisFrameCapability,
   type ComponentGpuAnalysisFrameCapability,
 } from "./gpu-analysis-frame-capability";
 import { createComponentGpuAnalysisDispatch } from "./gpu-analysis-dispatch";
+import { normalizeComponentGpuAnalysisValidationError } from "./gpu-analysis-validation-error";
 import {
   type ComponentGpuOutputHandles,
   destroyUntransferredSummaryBuffers,
@@ -44,7 +46,6 @@ import type {
 } from "./host/gpu-types";
 import {
   instantiateGpuAnalysisFrameComponent,
-  type GpuAnalysisFrameEncodedResult,
   type GpuAnalysisFrameInterface,
 } from "./providers/gpu-analysis-frame";
 import { probeWebAssemblySupport } from "./support-webassembly";
@@ -105,7 +106,7 @@ const encodeWithPreparedComponent = (
   let encoderProjectionConsumed = false;
   let externalEncoding: ExternalGpuCommandEncoding | null = null;
   let discardedEncodingBuffers: ReadonlySet<GPUBuffer> | undefined;
-  let result: GpuAnalysisFrameEncodedResult | undefined;
+  let summaryStagingHandle: RegisteredGpuBufferHandle | null = null;
   let outputHandles: ComponentGpuOutputHandles | null = null;
   let pendingSummary: ComponentGpuFramePendingSummary | null = null;
   let outputTransferred = false;
@@ -114,13 +115,19 @@ const encodeWithPreparedComponent = (
   let edgeDiscovery: ComponentGpuAnalysisEdgeDiscoveryOutput | null = null;
 
   try {
-    result = frameInterface.encode(
-      encoderHandle,
-      deviceHandle,
-      textureHandle,
-      truthHandle,
-      createComponentGpuAnalysisDispatch(input),
+    const dispatch = createComponentGpuAnalysisDispatch(input);
+    const result = invokeComponentOperation(
+      () =>
+        frameInterface.encode(
+          encoderHandle,
+          deviceHandle,
+          textureHandle,
+          truthHandle,
+          dispatch,
+        ),
+      normalizeComponentGpuAnalysisValidationError,
     );
+    summaryStagingHandle = result.summary.stagingBuffer;
     const { summary: encodedSummary, ...encodedOutputHandles } = result;
     outputHandles = encodedOutputHandles;
 
@@ -191,8 +198,8 @@ const encodeWithPreparedComponent = (
       discardedEncodingBuffers =
         discardExternalGpuCommandEncodingProjection(encoderHandle);
     }
-    if (!outputTransferred && !pendingSummary && result) {
-      destroyRegisteredSummaryStagingHandle(result.summary.stagingBuffer);
+    if (!outputTransferred && !pendingSummary && summaryStagingHandle) {
+      destroyRegisteredSummaryStagingHandle(summaryStagingHandle);
     }
     if (!outputTransferred && outputHandles) {
       forEachComponentGpuOutputValue(outputHandles, (handle) => {
@@ -203,7 +210,7 @@ const encodeWithPreparedComponent = (
     if (!encoderProjectionConsumed) {
       releaseWebGpuHandle(encoderHandle);
     }
-    releaseWebGpuHandle(result?.summary.stagingBuffer);
+    releaseWebGpuHandle(summaryStagingHandle);
     if (outputHandles) {
       forEachComponentGpuOutputValue(outputHandles, releaseWebGpuHandle);
     }
@@ -275,6 +282,10 @@ export type {
   ComponentGpuAnalysisFrameCapability,
   ComponentGpuAnalysisFrameOptions,
 } from "./gpu-analysis-frame-capability";
+export {
+  ComponentGpuAnalysisValidationError,
+  type ComponentGpuAnalysisValidationErrorKind,
+} from "./gpu-analysis-validation-error";
 export type {
   ComponentCapabilityLoader,
   ComponentCapabilityPrepareResult,

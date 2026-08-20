@@ -4,7 +4,7 @@
 /// `gpu-analysis` export. It proves jco's async component path for the
 /// analyzer by awaiting upstream browser WebGPU operations through JSPI.
 interface gpu-analysis-async {
-  use host-gpu.{analysis-border-trace-output, analysis-dispatch, analysis-edge-discovery-output, analysis-visual-output};
+  use host-gpu.{analysis-border-trace-output, analysis-dispatch, analysis-edge-discovery-output, analysis-validation-error, analysis-visual-output};
   use wasi:webgpu/webgpu@0.0.1.{gpu-buffer, gpu-device, gpu-texture};
 
   /// Backend-neutral aggregate statistics for one ground-truth node.
@@ -65,13 +65,13 @@ interface gpu-analysis-async {
   /// `WebAssembly.Suspending` and `WebAssembly.promising`. The returned summary
   /// is not the pixel-derived production discovery path.
   ///
-  /// Failures reject the async component call. This deliberately avoids the
-  /// `result<large-record, string>` JSPI lowering shape while that upstream
-  /// path remains unstable for our large analyzer result record.
+  /// Preflight validation failures reject with `analysis-validation-error`
+  /// before GPU work begins. Other failures remain outside this recoverable
+  /// validation channel.
   analyze: async func(
     device: borrow<gpu-device>,
     texture: borrow<gpu-texture>,
     truth-buffer: borrow<gpu-buffer>,
     request: analysis-dispatch,
-  ) -> analysis-result;
+  ) -> result<analysis-result, analysis-validation-error>;
 }
