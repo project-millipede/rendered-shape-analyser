@@ -24,6 +24,4 @@ pub(crate) use commands::submit_compatibility_dispatch;
 #[cfg(any(feature = "gpu-analysis", feature = "gpu-analysis-frame"))]
 pub(crate) use plan::build_compatibility_metadata;
 pub(crate) use plan::{project_diagnostic_plan, project_discovery_plan};
-pub(crate) use validation::{
-    validate_compatibility_request, validate_texture, validate_truth_buffer,
-};
+pub(crate) use validation::validate_analysis_preflight;

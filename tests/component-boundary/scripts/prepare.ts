@@ -209,7 +209,12 @@ async function transpileComponents(jco: string, componentRoot: string) {
       arguments_.push(...component.asyncExports);
     }
 
-    arguments_.push("--base64-cutoff", "0", "--no-namespaced-exports");
+    arguments_.push(
+      "--no-component-error-wrapping",
+      "--base64-cutoff",
+      "0",
+      "--no-namespaced-exports",
+    );
     await runNodeTool(jco, arguments_);
     await requireFile(
       join(outputDirectory, "inspector-component.js"),

@@ -80,10 +80,11 @@ still proves its readback plan, async integration still proves the Rust-decoded
 summary, and shared-frame integration still proves the pending-summary
 descriptor used after scheduler submission.
 
-JCO names, JSPI exports, base64 cutoff, and namespaced-export behavior mirror
-`scripts/sync.sh`. The mappings intentionally substitute the typed Node host
-for the browser host. Preparation resolves the locally installed TypeScript
-and JCO entrypoints directly and never invokes `npx`.
+JCO names, JSPI exports, component-error wrapping policy, base64 cutoff, and
+namespaced-export behavior mirror `scripts/sync.sh`. The mappings intentionally
+substitute the typed Node host for the browser host. Preparation resolves the
+locally installed TypeScript and JCO entrypoints directly and never invokes
+`npx`.
 
 Those are test-preparation parity requirements, not a second description of
 generated lowering. JCO provider and core-Wasm mechanics remain centralized in
@@ -106,7 +107,10 @@ registries while the test reset a second source-host instance.
 Vitest uses one worker, disables file parallelism and module isolation, and
 runs tests non-concurrently. `support/vitest-setup.ts` resets all observations
 and resource registries before each test, spies on guest logging, and restores
-Vitest mocks afterward. Topic files add only the setup needed by their world.
+Vitest mocks afterward. Each validation case performs its invalid and later
+valid calls inside one test through the same imported generated world, so
+module reloading cannot hide a failed recovery. Topic files add only the setup
+needed by their world.
 
 The WebGPU host is a typed stateful test double rather than a shallow
 `vi.mock()`: JCO links concrete WIT resource classes at instantiation, so a
@@ -139,27 +143,31 @@ command stream cannot be rolled back after a partial encode.
 
 ## Validation strategy
 
-`gpu-validation.integration.test.ts` exercises one representative invalid call
-through each retained public GPU world. All three calls use an undersized truth
-buffer, and their adapter-specific logs confirm that request and texture
-validation reached the intended final truth-buffer branch:
+`gpu-validation.integration.test.ts` exercises recoverable preflight failures
+through the raw generated GPU exports, followed by a valid call through the
+same generated instance:
 
-1. stable must trap without any captured pipeline/output, finish/submission,
-   resolution, or mapping effects;
-2. async must reject without those same captured effects;
-3. shared-frame must trap without beginning a pass or changing its borrowed
-   encoder.
+1. stable covers `invalid-request`, `texture-mismatch`, and
+   `truth-buffer-too-small` as directly lifted WIT error records;
+2. async covers the representative truth-buffer error using the same raw
+   record representation;
+3. shared-frame covers that truth-buffer error as a raw record and leaves its
+   borrowed encoder unchanged.
+
+None of those failures is a `WebAssembly.RuntimeError`. Every later valid call
+returns the ordinary bare success record and performs the expected work,
+proving that the invalid call did not trap the instance.
 
 That representative validation failure occurs before command recording and
 therefore proves an untouched encoder. It does not weaken the more general
 failure rule: if any later `encode()` step throws after appending commands, the
 scheduler abandons the whole frame and encoder.
 
-Rust unit tests own the pure metadata cases, their exact rule ordering, and
-metadata error strings. The representative resource failure remains at the
-generated boundary. Do not multiply the three component cases by every invalid
-field; they prove each adapter's distinct failure and lifecycle behavior, not
-the pure validation arithmetic again.
+Rust unit tests own the remaining pure request-metadata cases, their ordering,
+and their exact error strings. Stable covers the three public categories and
+their cross-layer precedence once; async and frame repeat only the
+representative resource failure needed to prove their distinct generated error
+shape and lifecycle behavior.
 
 ## Shared GPU fixture
 

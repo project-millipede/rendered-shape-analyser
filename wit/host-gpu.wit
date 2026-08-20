@@ -26,6 +26,28 @@ interface host-gpu {
     node-count: u32,
   }
 
+  /// Stable category for one recoverable analyzer preflight failure.
+  ///
+  /// These categories cover only validation completed before GPU planning,
+  /// allocation, command encoding, or submission begins. Failures after that
+  /// boundary remain runtime failures rather than validation outcomes.
+  enum analysis-validation-error-kind {
+    /// The dispatch metadata violates the analyzer request contract.
+    invalid-request,
+    /// The declared dimensions do not match the supplied GPU texture.
+    texture-mismatch,
+    /// The supplied truth buffer cannot contain the declared node count.
+    truth-buffer-too-small,
+  }
+
+  /// Recoverable analyzer preflight failure returned by every GPU world.
+  record analysis-validation-error {
+    /// Machine-readable validation category.
+    kind: analysis-validation-error-kind,
+    /// Human-readable reason suitable for diagnostics and rejection messages.
+    message: string,
+  }
+
   /// Analyzer kernel selected by the Rust component.
   ///
   /// New kernels must be added here before the host can dispatch them. This

@@ -76,14 +76,17 @@ npx jco transpile \
     'millipede:inspector/host-log@0.1.0=../../../component-loader/dist/host/log.js' \
   --map \
     'wasi:webgpu/webgpu@0.0.1=../../../component-loader/dist/host/webgpu.js' \
+  --no-component-error-wrapping \
   --base64-cutoff 0 \
   --no-namespaced-exports
 ```
 
 The mappings connect component imports to the built handwritten browser host.
-Async worlds additionally use JSPI mode and explicit async-export names. The
-zero base64 cutoff keeps every generated core module in an external `.wasm`
-file rather than embedding Wasm bytes into JavaScript.
+Async worlds additionally use JSPI mode and explicit async-export names.
+`--no-component-error-wrapping` makes top-level WIT `result::err` values cross
+the generated synchronous and JSPI boundaries as their directly lifted WIT
+payloads. The zero base64 cutoff keeps every generated core module in an
+external `.wasm` file rather than embedding Wasm bytes into JavaScript.
 
 The root package contains the authored loader output under
 `component-loader/dist/` and current generated-provider payload under
