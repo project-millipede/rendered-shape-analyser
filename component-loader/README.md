@@ -30,10 +30,11 @@ const output = await prepared.capability.analyze(input, { summaryResolver });
 A selected subpath owns one module-wide loader. Its only lifecycle operation is
 one-shot `prepare()`; `state` is a read-only observation. Concurrent and later
 calls share the same Promise and result. Their public TypeScript contracts are
-read-only; they do not rely on runtime freezing. `ready` means the selected
-capability is callable and its later operations perform no import, download,
-compilation, instantiation, or self-test. `unsupported` and `failed` remain
-distinct settled outcomes for that imported module URL.
+read-only; they do not rely on runtime freezing. `ready` means preparation
+produced the selected callable capability and its later operations perform no
+import, download, compilation, instantiation, or self-test; it is not a dynamic
+post-invocation health signal. `unsupported` and `failed` remain distinct
+settled outcomes for that imported module URL.
 
 There is deliberately no `retry()` or loader `dispose()`. Browsers may cache a
 failed ESM evaluation for one URL, while the current private provider has no
@@ -57,6 +58,11 @@ thrown value—including every `Error` and `WebAssembly.RuntimeError`—passes
 through unchanged. These preflight failures occur before GPU work, fail only
 that invocation, and leave the same prepared component instance callable for a
 later valid request.
+
+Invocation outcomes do not add states or transitions to the preparation-only
+loader; the separate
+[instance failure and recovery follow-up](../docs/architecture/component-instance-failure-and-recovery.md)
+owns that distinction and possible long-term replacement boundaries.
 
 ## Where it fits
 
