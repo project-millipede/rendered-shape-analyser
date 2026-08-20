@@ -2,8 +2,6 @@ import type * as GpuAnalysisFrameInterfaceModule from "../../../pkg/generated/gp
 import { requireGeneratedCapability } from "./shared";
 
 export type GpuAnalysisFrameInterface = typeof GpuAnalysisFrameInterfaceModule;
-export type GpuAnalysisFrameEncodedResult =
-  GpuAnalysisFrameInterfaceModule.EncodedAnalysisFrame;
 
 /**
  * Prepare the scheduler-owned shared-frame capability.

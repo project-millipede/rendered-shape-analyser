@@ -110,6 +110,14 @@ boundary-proof entry neither owns nor replaces them.
 |       10 | Failed frame projection cleanup destroys every recorded output without finishing the encoder. |
 |        9 | Frame discard reports only native buffers whose destruction actually succeeded.               |
 
+### `component-gpu-analysis-validation-error.test.ts`
+
+| Priority | Protected authored validation-error behavior                                  |
+| -------: | ----------------------------------------------------------------------------- |
+|       10 | Raw WIT records normalize to `ComponentGpuAnalysisValidationError`.           |
+|       10 | `WebAssembly.RuntimeError` preserves its identity.                            |
+|        9 | Inherited and malformed raw values preserve their identities.                 |
+
 ### `host-gpu-readback.test.ts`
 
 | Priority | Protected fake-host behavior                                       |

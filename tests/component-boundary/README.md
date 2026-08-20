@@ -141,6 +141,12 @@ synchronous, and every throw requires the scheduler to abandon that
 encoder/frame without appending render work, finishing, or submitting. A native
 command stream cannot be rolled back after a partial encode.
 
+`component-gpu-analysis-validation-error.test.ts` proves the authored
+normalization boundary without instantiating a generated provider. It accepts
+only non-`Error` values structurally matching the directly lifted WIT error
+record. It preserves `WebAssembly.RuntimeError` and malformed or inherited raw
+records by identity.
+
 ## Validation strategy
 
 `gpu-validation.integration.test.ts` exercises recoverable preflight failures
@@ -156,7 +162,10 @@ same generated instance:
 
 None of those failures is a `WebAssembly.RuntimeError`. Every later valid call
 returns the ordinary bare success record and performs the expected work,
-proving that the invalid call did not trap the instance.
+proving that the invalid call did not trap the instance. The authored GPU
+subpaths normalize the generated error record to
+`ComponentGpuAnalysisValidationError`; the unit test above owns that focused
+normalization proof.
 
 That representative validation failure occurs before command recording and
 therefore proves an untouched encoder. It does not weaken the more general
