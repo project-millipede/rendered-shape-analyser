@@ -1,11 +1,12 @@
 # Component instance failure and recovery
 
-> - **Status:** Experimental Strategy 3 architecture candidate
-> - **Last reviewed:** 2026-08-19
+> - **Status:** Selected Strategy 3 architecture contract
+> - **Last reviewed:** 2026-08-20
 > - **Applies to:** Failures after a component capability has prepared
 > - **Does not authorize:** Invocation retry, new loader states, automatic
 >   fallback, provider replacement, or Worker deployment
-> - **Current branch:** `wit-result-without-preflight-traps`
+> - **Selected design:** Top-level WIT `result<T, E>` developed on
+>   `wit-result-without-preflight-traps`
 > - **Preserved alternative:** Strategy 4 on
 >   `jco-preflight-validation-without-traps`
 > - **Related:**
@@ -14,16 +15,16 @@
 >   and the
 >   [JCO-generated artifact baseline](../tooling/jco-generated-artifact-baseline.md)
 
-## Strategy 3 branch experiment
+## Selected Strategy 3 contract
 
-This branch evaluates preflight validation as a recoverable operation outcome.
+This contract defines preflight validation as a recoverable operation outcome.
 Each GPU world uses a top-level WIT
 `result<T, analysis-validation-error>`, with Rust as the authoritative
 validator. Successful generated calls still return the bare success record.
 The authored exact GPU subpaths normalize the generated error record to
 `ComponentGpuAnalysisValidationError`.
 
-This Strategy 3 candidate lets a later valid request use the same prepared
+The selected Strategy 3 design lets a later valid request use the same prepared
 component instance. It is an API policy, not a requirement imposed by a
 dependency upgrade. It avoids duplicating validation in TypeScript and avoids
 wrapping every successful value in an authored outcome variant.
@@ -42,9 +43,10 @@ wrapping every successful value in an authored outcome variant.
 
 3. **Strategy 3 — Return a top-level WIT `result`.**
 
-   This is implemented on `wit-result-without-preflight-traps`. Rust remains
-   authoritative, successful JavaScript calls keep their bare result, and
-   validation failure does not trap the instance.
+   This is the selected design. It was developed on
+   `wit-result-without-preflight-traps`. Rust remains authoritative,
+   successful JavaScript calls keep their bare result, and validation failure
+   does not trap the instance.
 
 4. **Strategy 4 — Return a tagged success-or-error outcome.**
 
