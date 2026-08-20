@@ -104,4 +104,4 @@ npm run loader:build
 echo "--- synced to $GENERATED_DIR ---"
 find "$GENERATED_DIR" -type f | sort
 echo "note: in the website repo, refresh pnpm's file: snapshot with:"
-echo "  pnpm add -w @millipede/inspector-component@file:../../../Reverse-Engineering/Frida/Source-Code-Org/Wasm/inspector-component"
+echo "  pnpm --filter @millipede/surface-inspector-browser --fail-if-no-match install --frozen-lockfile --prod=false --no-optimistic-repeat-install"
